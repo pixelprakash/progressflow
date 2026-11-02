@@ -48,3 +48,30 @@ The Android build allows cleartext traffic for this; switch it off
   written; media is looked up by DB row, never by a client-supplied path.
 - Uploads are served `nosniff`; only images and audio are shown inline.
 - Not done: HTTPS termination, token revocation, an audit log, encryption at rest.
+
+## Deploying the API on Vercel
+
+`apps/server` is set up as a Vercel project (root directory `apps/server`):
+`vercel.json` runs `npm run build && prisma migrate deploy`, and `api/index.js`
+is the function that wraps the compiled Express app. Verified locally by running
+that handler against Postgres and the full e2e suite; Vercel's own bundling has
+not been verified from here.
+
+Environment variables (Project → Settings → Environment Variables), needed at
+build time as well as runtime:
+
+| Name | Value |
+|---|---|
+| `DATABASE_URL` | the **direct** `postgres://…` connection string (with Prisma Postgres, the TCP one, not the `prisma+postgres://` Accelerate URL) |
+| `JWT_SECRET` | a long random string, e.g. `openssl rand -base64 48`. The server refuses to start in production with the dev default |
+
+Limits to know about:
+
+- **Media storage is not configured on Vercel.** Functions have no persistent
+  disk, so `PUT /v1/media/…` answers `503 storage_unavailable`. Scores, notes and
+  markup sync and show on the dashboard; photos and voice notes do not until an
+  object store (S3-compatible, private bucket) is added.
+- Request bodies are capped at 4.5 MB on Vercel functions.
+- Point the dashboard (`apps/web`) at the API with a rewrite in
+  `apps/web/vercel.json`: `{ "source": "/v1/:path*", "destination": "https://<api-host>/v1/:path*" }`,
+  placed before the catch-all. The phone's server address is the API's https URL.

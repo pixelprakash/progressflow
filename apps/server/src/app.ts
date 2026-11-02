@@ -20,6 +20,10 @@ const WEB_DIST = resolve(here, '../../web/dist');
 export function createApp() {
   const app = express();
 
+  // Behind a host's proxy (Vercel, Render, Fly): trust it for the client IP, or the
+  // login rate limit would see every user as the same address.
+  if (config.NODE_ENV === 'production') app.set('trust proxy', 1);
+
   app.use(
     helmet({
       contentSecurityPolicy: {

@@ -47,7 +47,17 @@ mediaRouter.put(
     }
     const key = await keyFor(req.teacherId!, kind, id);
     if (!key) return fail(res, 404, 'not_found', 'push the submission before its media');
-    await save(key, req.body);
+    try {
+      await save(key, req.body);
+    } catch {
+      // e.g. a read-only filesystem on serverless hosts: say so instead of crashing
+      return fail(
+        res,
+        503,
+        'storage_unavailable',
+        'media storage is not configured on this server',
+      );
+    }
     res.json({ ok: true });
   },
 );
