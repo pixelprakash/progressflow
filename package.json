@@ -1,0 +1,39 @@
+{
+  "name": "progressflow",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Mobile formative-assessment system for art & design educators",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build:shared": "npm run build -w @progressflow/shared",
+    "dev:server": "npm run dev -w @progressflow/server",
+    "dev:mobile": "npm run start -w @progressflow/mobile",
+    "db:up": "docker compose -f infra/docker-compose.yml up -d",
+    "db:down": "docker compose -f infra/docker-compose.yml down",
+    "db:migrate": "npm run prisma:migrate -w @progressflow/server",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "build:apk": "scripts/build-apk.sh",
+    "dev:db": "npm run dev:db -w @progressflow/server",
+    "dev:web": "npm run dev -w @progressflow/web",
+    "dev:site": "npm run dev -w @progressflow/site",
+    "build:web": "npm run build -w @progressflow/web",
+    "build:site": "npm run build -w @progressflow/site",
+    "test:e2e": "npm exec -w @progressflow/server -- tsx test/e2e.ts"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^8.20.0",
+    "@typescript-eslint/parser": "^8.20.0",
+    "eslint": "^8.57.1",
+    "eslint-config-prettier": "^9.1.0",
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

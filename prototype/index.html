@@ -1,0 +1,1277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>ProgressFlow</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --font-display:'Sora',sans-serif;
+    --font-body:'IBM Plex Sans',sans-serif;
+    --font-mono:'IBM Plex Mono',monospace;
+
+    --text:#16171B;
+    --text-muted:#5B5E66;
+    --text-faint:#8C8F97;
+    --bg:#FBFBF9;
+    --surface:#F1F1ED;
+    --surface-2:#E7E6DF;
+    --border:#DAD9D1;
+    --accent:#2851C4;
+    --accent-contrast:#FFFFFF;
+    --accent-soft:rgba(40,81,196,.08);
+    --marigold:#E08A1E;
+    --marigold-soft:rgba(224,138,30,.16);
+    --vermilion:#D2492B;
+    --success:#2F7D4F;
+    --success-soft:rgba(47,125,79,.14);
+    --shadow:rgba(22,23,27,.14);
+    --phone-bezel:#101114;
+    color-scheme:light;
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --text:#EDEDEA; --text-muted:#B4B6BC; --text-faint:#83858C;
+      --bg:#121317; --surface:#1B1C20; --surface-2:#232429; --border:#34363C;
+      --accent:#8AA6FF; --accent-contrast:#0B1020; --accent-soft:rgba(138,166,255,.14);
+      --marigold:#F0A63D; --marigold-soft:rgba(240,166,61,.18);
+      --vermilion:#FF7A5C; --success:#5FCB8E; --success-soft:rgba(95,203,142,.16);
+      --shadow:rgba(0,0,0,.5); --phone-bezel:#000;
+      color-scheme:dark;
+    }
+  }
+  :root[data-theme="dark"]{
+    --text:#EDEDEA; --text-muted:#B4B6BC; --text-faint:#83858C;
+    --bg:#121317; --surface:#1B1C20; --surface-2:#232429; --border:#34363C;
+    --accent:#8AA6FF; --accent-contrast:#0B1020; --accent-soft:rgba(138,166,255,.14);
+    --marigold:#F0A63D; --marigold-soft:rgba(240,166,61,.18);
+    --vermilion:#FF7A5C; --success:#5FCB8E; --success-soft:rgba(95,203,142,.16);
+    --shadow:rgba(0,0,0,.5); --phone-bezel:#000;
+    color-scheme:dark;
+  }
+
+  *{box-sizing:border-box;}
+  [hidden]{display:none !important;}
+  body{background:var(--bg);color:var(--text);font-family:var(--font-body);margin:0;}
+  button{font-family:inherit;}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+  @media (prefers-reduced-motion:reduce){ *{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important;} }
+
+  .ic{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;display:block;}
+
+  .page{max-width:1180px;margin:0 auto;padding-inline:20px;padding-block:28px 48px;display:flex;flex-direction:column;gap:26px;}
+
+  .page-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;}
+  .brand{display:flex;gap:12px;align-items:flex-start;}
+  .brand-mark{width:42px;height:42px;border-radius:12px;background:var(--accent);color:var(--accent-contrast);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .brand-mark svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;}
+  .brand h1{font-family:var(--font-display);font-size:24px;letter-spacing:-0.02em;margin:0;font-weight:700;}
+  .brand p{color:var(--text-muted);font-size:13px;margin:3px 0 0;max-width:46ch;}
+
+  .role-toggle{display:inline-flex;background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:4px;gap:2px;flex-shrink:0;}
+  .role-toggle button{border:0;background:transparent;padding:9px 18px;border-radius:999px;font-size:13px;font-weight:600;color:var(--text-muted);cursor:pointer;transition:background .15s,color .15s;}
+  .role-toggle button.active{background:var(--accent);color:var(--accent-contrast);}
+
+  .layout{display:grid;grid-template-columns:minmax(0,320px) minmax(0,1fr);gap:30px;align-items:start;}
+  @media (max-width:860px){.layout{grid-template-columns:1fr;}}
+
+  .stage{display:flex;flex-direction:column;align-items:center;gap:16px;position:sticky;top:20px;}
+  @media (max-width:860px){.stage{position:static;}}
+
+  .phone{position:relative;width:min(300px,84vw);aspect-ratio:9/19.4;background:var(--phone-bezel);border-radius:44px;padding:12px;box-shadow:0 30px 60px -24px var(--shadow),0 0 0 1px rgba(255,255,255,.05) inset;}
+  .notch{position:absolute;top:12px;left:50%;transform:translateX(-50%);width:38%;height:20px;background:var(--phone-bezel);border-radius:0 0 14px 14px;z-index:6;}
+  .screen{position:relative;width:100%;height:100%;background:var(--bg);border-radius:32px;overflow:hidden;display:flex;flex-direction:column;font-size:13px;}
+
+  .status-bar{display:flex;justify-content:space-between;align-items:center;padding:10px 20px 2px;font-family:var(--font-mono);font-size:10.5px;color:var(--text-muted);flex-shrink:0;}
+  .status-bar .dots{display:flex;gap:3px;align-items:flex-end;}
+  .status-bar .dots i{display:block;width:3px;background:var(--text-muted);border-radius:1px;}
+  .status-bar .dots i:nth-child(1){height:4px;} .status-bar .dots i:nth-child(2){height:6px;} .status-bar .dots i:nth-child(3){height:8px;} .status-bar .dots i:nth-child(4){height:10px;}
+
+  .app-header{padding:6px 16px 12px;border-bottom:1px solid var(--border);flex-shrink:0;}
+  .app-body{flex:1;min-height:0;overflow-y:auto;padding:14px 16px 90px;display:flex;flex-direction:column;gap:14px;-webkit-overflow-scrolling:touch;}
+  .app-body::-webkit-scrollbar{width:0;height:0;}
+
+  .tab-bar{position:absolute;left:0;right:0;bottom:0;display:flex;border-top:1px solid var(--border);background:color-mix(in srgb, var(--bg) 88%, transparent);backdrop-filter:blur(6px);}
+  .tab-bar button{flex:1;border:0;background:transparent;display:flex;flex-direction:column;align-items:center;gap:3px;padding:9px 4px 12px;color:var(--text-faint);cursor:pointer;}
+  .tab-bar button span{font-size:10px;font-weight:500;}
+  .tab-bar button.active{color:var(--accent);}
+
+  .scr{display:flex;flex-direction:column;gap:14px;}
+  .scr[hidden]{display:none !important;}
+  .sub-panel{display:flex;flex-direction:column;gap:14px;}
+  .sub-panel[hidden]{display:none !important;}
+
+  h2{font-family:var(--font-display);font-size:19px;margin:0;font-weight:700;letter-spacing:-.01em;}
+  h3.section-title{font-family:var(--font-display);font-size:14px;margin:2px 0 -4px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;}
+  .muted{color:var(--text-muted);}
+  .muted.small{font-size:11.5px;}
+
+  .classes-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;}
+  .sync-pill{display:flex;align-items:center;gap:6px;border:1px solid var(--border);background:var(--surface);border-radius:999px;padding:6px 10px;font-size:11px;font-weight:600;color:var(--text-faint);cursor:pointer;flex-shrink:0;}
+  .sync-pill svg{width:14px;height:14px;}
+  .sync-pill.syncing{color:var(--marigold);border-color:var(--marigold);}
+  .sync-pill.syncing svg{animation:spin 1s linear infinite;}
+  .sync-pill.synced{color:var(--success);border-color:var(--success);}
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  .assignment-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:6px;}
+  .assignment-card strong{font-size:14px;}
+  .progress-track{height:6px;border-radius:999px;background:var(--surface-2);overflow:hidden;margin-top:4px;}
+  .progress-fill{height:100%;background:var(--accent);border-radius:999px;transition:width .3s;}
+
+  .student-list{display:flex;flex-direction:column;gap:8px;}
+  .student-row{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:10px 12px;cursor:pointer;text-align:left;width:100%;}
+  .avatar{width:34px;height:34px;border-radius:10px;background:var(--accent-soft);color:var(--accent);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:12px;font-weight:600;flex-shrink:0;}
+  .student-row .name-wrap{flex:1;min-width:0;display:flex;flex-direction:column;}
+  .student-row strong{font-size:13px;}
+  .chip{font-size:10.5px;font-weight:600;padding:3px 8px;border-radius:999px;background:var(--surface-2);color:var(--text-faint);flex-shrink:0;white-space:nowrap;}
+  .chip.done{background:var(--success-soft);color:var(--success);}
+  .student-row .ic{color:var(--text-faint);flex-shrink:0;}
+
+  .assess-head{display:flex;align-items:center;gap:10px;}
+  .icon-btn{border:1px solid var(--border);background:var(--surface);width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text);flex-shrink:0;}
+  .assess-head strong{display:block;font-size:14px;}
+
+  .subtabs{display:flex;gap:6px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:4px;}
+  .subtabs button{flex:1;border:0;background:transparent;padding:8px 6px;border-radius:9px;font-size:12px;font-weight:600;color:var(--text-muted);cursor:pointer;}
+  .subtabs button.active{background:var(--accent);color:var(--accent-contrast);}
+
+  .rubric-list{display:flex;flex-direction:column;gap:10px;}
+  .rubric-row{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:8px;}
+  .rubric-row-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;}
+  .rubric-row-head strong{font-size:13px;}
+  .rubric-level-label{font-size:11px;font-weight:600;color:var(--accent);}
+  .level-btns{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;}
+  .level-btns button{border:1px solid var(--border);background:var(--bg);border-radius:9px;padding:8px 0;font-family:var(--font-mono);font-size:13px;font-weight:600;color:var(--text-muted);cursor:pointer;}
+  .level-btns button.active{background:var(--accent);border-color:var(--accent);color:var(--accent-contrast);}
+  .descriptor{font-size:11.5px;color:var(--text-muted);margin:0;min-height:14px;}
+
+  .save-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding-top:2px;}
+  .btn{border:0;border-radius:12px;padding:11px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;}
+  .btn.primary{background:var(--accent);color:var(--accent-contrast);}
+  .btn.ghost{background:var(--surface);border:1px solid var(--border);color:var(--text);}
+  .btn.block{width:100%;}
+
+  .photo-frame{position:relative;border-radius:14px;overflow:hidden;border:1px solid var(--border);aspect-ratio:4/3;background:var(--surface);touch-action:none;}
+  .photo-frame svg{position:absolute;inset:0;width:100%;height:100%;}
+  .photo-overlay{cursor:crosshair;}
+  .mark-circle{fill:none;stroke:var(--vermilion);stroke-width:3;}
+  .mark-highlight{fill:var(--marigold-soft);stroke:var(--marigold);stroke-width:1.5;}
+  .mark-arrow{stroke:var(--accent);stroke-width:3;stroke-linecap:round;}
+  .mark-freehand{fill:none;stroke:var(--text);stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;}
+
+  .tool-row{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;}
+  .tool-btn{display:flex;flex-direction:column;align-items:center;gap:4px;border:1px solid var(--border);background:var(--surface);border-radius:11px;padding:8px 2px;font-size:10px;font-weight:600;color:var(--text-muted);cursor:pointer;}
+  .tool-btn .ic{width:16px;height:16px;}
+  .tool-btn[data-tool="circle"] .ic{color:var(--vermilion);}
+  .tool-btn[data-tool="highlight"] .ic{color:var(--marigold);}
+  .tool-btn[data-tool="arrow"] .ic{color:var(--accent);}
+  .tool-btn[data-tool="freehand"] .ic{color:var(--text);}
+  .tool-btn.active{background:var(--surface-2);border-color:var(--text-faint);color:var(--text);}
+  .tool-meta{display:flex;justify-content:space-between;align-items:center;font-size:11px;}
+  .link-btn{border:0;background:transparent;color:var(--accent);font-weight:600;font-size:11.5px;cursor:pointer;padding:0;}
+
+  .voice-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:12px;}
+  .voice-row{display:flex;align-items:center;gap:12px;}
+  .mic-btn{width:46px;height:46px;border-radius:50%;border:0;background:var(--accent);color:var(--accent-contrast);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;position:relative;}
+  .mic-btn.is-recording{background:var(--vermilion);}
+  .mic-btn.is-recording::after{content:"";position:absolute;inset:-6px;border-radius:50%;border:2px solid var(--vermilion);animation:pulse 1.4s ease-out infinite;}
+  @keyframes pulse{0%{opacity:.7;transform:scale(.9);}100%{opacity:0;transform:scale(1.35);}}
+  .voice-meta{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px;}
+  .waveform{display:flex;align-items:center;gap:3px;height:22px;}
+  .waveform span{display:block;width:3px;border-radius:2px;background:var(--text-faint);height:6px;transition:height .15s;}
+  .waveform.recording span{background:var(--vermilion);animation:wave 1s ease-in-out infinite;}
+  .waveform span:nth-child(odd){animation-delay:-.3s;}
+  .waveform span:nth-child(3n){animation-delay:-.6s;}
+  @keyframes wave{0%,100%{height:6px;}50%{height:20px;}}
+  .voice-time{font-family:var(--font-mono);font-size:11px;color:var(--text-muted);}
+
+  .lang-row{display:flex;gap:6px;}
+  .lang-row.small .lang-chip{padding:4px 9px;font-size:10.5px;}
+  .lang-chip{border:1px solid var(--border);background:var(--bg);border-radius:999px;padding:6px 12px;font-size:11.5px;font-weight:600;color:var(--text-muted);cursor:pointer;}
+  .lang-chip.active{background:var(--accent);border-color:var(--accent);color:var(--accent-contrast);}
+
+  .transcript-box{background:var(--bg);border:1px dashed var(--border);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:6px;}
+  .transcript-box[hidden]{display:none !important;}
+  .transcript-status{font-size:11px;font-weight:600;color:var(--marigold);display:flex;align-items:center;gap:6px;}
+  .transcript-status.done{color:var(--success);}
+  .transcript-box textarea{width:100%;resize:none;border:1px solid var(--border);border-radius:8px;padding:8px;font-family:inherit;font-size:12px;background:var(--surface);color:var(--text);}
+  .transcript-meta{font-size:10.5px;color:var(--text-faint);}
+
+  .dash-head{display:flex;flex-direction:column;gap:2px;}
+  .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  .stat-tile{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:10px 12px;display:flex;flex-direction:column;gap:2px;}
+  .stat-tile b{font-family:var(--font-mono);font-size:19px;font-variant-numeric:tabular-nums;}
+  .stat-tile .stat-label{font-size:10.5px;color:var(--text-muted);}
+  .stat-tile .stat-delta{font-size:10.5px;font-weight:600;color:var(--success);}
+
+  .student-chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;}
+  .student-chip{flex-shrink:0;border:1px solid var(--border);background:var(--surface);border-radius:999px;padding:7px 13px;font-size:11.5px;font-weight:600;color:var(--text-muted);cursor:pointer;white-space:nowrap;}
+  .student-chip.active{background:var(--accent);border-color:var(--accent);color:var(--accent-contrast);}
+
+  .chart-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:12px;display:flex;flex-direction:column;gap:8px;}
+  .chart-legend{display:flex;flex-wrap:wrap;gap:6px;}
+  .legend-chip{display:flex;align-items:center;gap:5px;border:1px solid var(--border);background:var(--bg);border-radius:999px;padding:5px 9px;font-size:10.5px;font-weight:600;color:var(--text-muted);cursor:pointer;}
+  .legend-chip i{width:8px;height:8px;border-radius:50%;display:block;}
+  .legend-chip.off{opacity:.4;}
+  .chart-card svg{width:100%;height:auto;display:block;}
+  .chart-x-labels{display:flex;justify-content:space-between;font-size:10px;color:var(--text-faint);padding:0 4px;}
+
+  .export-panel{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:10px;}
+  .export-panel[hidden]{display:none !important;}
+  .export-panel table{width:100%;border-collapse:collapse;font-size:11.5px;}
+  .export-panel th{text-align:left;color:var(--text-faint);font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.03em;padding-bottom:6px;}
+  .export-panel td{padding:5px 0;border-top:1px solid var(--border);font-variant-numeric:tabular-nums;}
+  .export-panel td.delta{color:var(--success);font-weight:600;text-align:right;}
+
+  .callout{display:flex;gap:10px;align-items:flex-start;background:var(--success-soft);border:1px solid var(--success);border-radius:14px;padding:12px;}
+  .callout .ic{color:var(--success);flex-shrink:0;margin-top:1px;}
+  .callout strong{display:block;font-size:12.5px;}
+  .callout span{font-size:11.5px;color:var(--text-muted);}
+
+  .portal-hero{display:flex;gap:10px;align-items:center;}
+  .portal-avatar{width:44px;height:44px;border-radius:12px;background:var(--accent);color:var(--accent-contrast);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-weight:600;font-size:14px;flex-shrink:0;}
+
+  .work-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:12px;display:flex;gap:10px;}
+  .work-thumb{width:64px;height:64px;border-radius:10px;overflow:hidden;background:var(--bg);border:1px solid var(--border);flex-shrink:0;}
+  .work-thumb svg{width:100%;height:100%;}
+  .work-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px;}
+  .work-info strong{font-size:12.5px;}
+  .voice-mini{display:flex;align-items:center;gap:8px;}
+  .play-btn{width:26px;height:26px;border-radius:50%;border:0;background:var(--accent);color:var(--accent-contrast);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
+  .mini-wave{display:flex;gap:2px;align-items:center;height:14px;flex:1;}
+  .mini-wave span{width:2px;height:5px;border-radius:1px;background:var(--text-faint);}
+  .mini-wave.playing span{background:var(--accent);animation:wave .8s ease-in-out infinite;}
+  .mini-wave span:nth-child(even){animation-delay:-.25s;}
+  .voice-len{font-family:var(--font-mono);font-size:10px;color:var(--text-faint);}
+  .transcript-quote{font-size:11.5px;font-style:italic;color:var(--text-muted);margin:0;border-left:2px solid var(--border);padding-left:8px;}
+
+  .profile-card{display:flex;flex-direction:column;align-items:center;text-align:center;gap:4px;padding:10px 0 4px;}
+  .profile-card h2{margin-top:4px;}
+  .profile-fields{display:flex;flex-direction:column;gap:0;background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin:0;}
+  .profile-fields div{display:flex;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--border);font-size:12px;}
+  .profile-fields div:last-child{border-bottom:0;}
+  .profile-fields dt{color:var(--text-muted);}
+  .profile-fields dd{margin:0;font-weight:600;}
+
+  .peer-progress{display:flex;gap:5px;}
+  .peer-progress i{flex:1;height:5px;border-radius:999px;background:var(--surface-2);}
+  .peer-progress i.active{background:var(--accent);}
+  .peer-choices{display:flex;flex-direction:column;gap:7px;}
+  .peer-choices button{text-align:left;border:1px solid var(--border);background:var(--surface);border-radius:11px;padding:10px 12px;font-size:12.5px;font-weight:600;color:var(--text);cursor:pointer;}
+  .peer-choices button.active{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);}
+  .peer-nav{display:flex;gap:8px;}
+  .peer-nav .btn{flex:1;}
+  textarea.peer-text{width:100%;border:1px solid var(--border);border-radius:10px;padding:9px;font-family:inherit;font-size:12px;background:var(--surface);color:var(--text);resize:none;}
+  .peer-done{display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px;padding:30px 6px;}
+  .peer-done .check-ring{width:54px;height:54px;border-radius:50%;background:var(--success-soft);border:1px solid var(--success);display:flex;align-items:center;justify-content:center;color:var(--success);}
+
+  .toast{position:absolute;left:50%;bottom:78px;transform:translate(-50%,8px);background:var(--text);color:var(--bg);font-size:11.5px;font-weight:600;padding:9px 14px;border-radius:999px;opacity:0;pointer-events:none;transition:opacity .18s,transform .18s;z-index:20;white-space:nowrap;}
+  .toast.show{opacity:1;transform:translate(-50%,0);}
+
+  .stage-caption{max-width:300px;text-align:center;}
+  .stage-caption .tag{display:inline-block;font-family:var(--font-mono);font-size:10.5px;font-weight:600;color:var(--accent);background:var(--accent-soft);border-radius:999px;padding:2px 8px;margin-bottom:5px;}
+  .stage-caption strong{display:block;font-size:13px;}
+  .stage-caption span{display:block;font-size:11.5px;color:var(--text-muted);margin-top:2px;}
+
+  .index{display:flex;flex-direction:column;gap:10px;}
+  .index h2{font-size:15px;}
+  .index > p{margin:0;font-size:12px;color:var(--text-muted);}
+  .index-item{all:unset;box-sizing:border-box;cursor:pointer;display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border:1px solid var(--border);border-radius:14px;background:var(--surface);}
+  .index-item:hover{border-color:var(--accent);}
+  .index-item.active{background:var(--accent-soft);border-color:var(--accent);}
+  .index-tag{flex-shrink:0;width:36px;height:36px;border-radius:10px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:10.5px;font-weight:700;color:var(--text-muted);}
+  .index-item.active .index-tag{background:var(--accent);color:var(--accent-contrast);}
+  .index-copy strong{display:block;font-size:13.5px;font-weight:600;}
+  .index-copy span{display:block;font-size:12px;color:var(--text-muted);margin-top:2px;}
+
+  .research{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:16px;padding:20px;border:1px solid var(--border);border-radius:16px;background:var(--surface);}
+  .research .stat b{font-family:var(--font-mono);font-size:22px;display:block;font-variant-numeric:tabular-nums;}
+  .research .stat span{color:var(--text-muted);font-size:12px;}
+  .research-note{font-size:11.5px;color:var(--text-faint);margin:0;}
+</style>
+
+</head>
+<body>
+<div class="page">
+  <header class="page-head">
+    <div class="brand">
+      <div class="brand-mark"><svg viewBox="0 0 24 24"><path d="M4 5h16v10H9l-4 4V5z"/><path d="m8.5 10 2 2 4-4"/></svg></div>
+      <div>
+        <h1>ProgressFlow</h1>
+        <p>Interactive prototype of the six-month MVP — tap through it like a real app. Built from the pitch deck and <code>ROADMAP.md</code>; nothing here is wired to the server yet.</p>
+      </div>
+    </div>
+    <div class="role-toggle" id="roleToggle">
+      <button data-action="role" data-role="teacher" class="active">Teacher view</button>
+      <button data-action="role" data-role="student">Student view</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="stage">
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="screen">
+          <div class="status-bar">
+            <span id="clock">9:41</span>
+            <span class="dots"><i></i><i></i><i></i><i></i></span>
+          </div>
+
+          <div class="app-header" id="appHeader"></div>
+
+          <div class="app-body" id="appBody">
+
+            <div class="scr" data-screen="home-teacher">
+              <div class="classes-head">
+                <div>
+                  <h2>Class VII-B</h2>
+                  <span class="muted small">Demo Government High School</span>
+                </div>
+                <button class="sync-pill" id="syncPill" data-action="sync-cycle"></button>
+              </div>
+              <div class="assignment-card">
+                <strong>Still life — pencil</strong>
+                <span class="muted small">Graphite on paper · Due today</span>
+                <div class="progress-track"><div class="progress-fill" id="assignProgress"></div></div>
+                <span class="muted small" id="assignProgressLabel"></span>
+              </div>
+              <h3 class="section-title">Students</h3>
+              <div class="student-list" id="studentList"></div>
+            </div>
+
+            <div class="scr" data-screen="assess">
+              <div class="sub-panel" data-sub="rubric">
+                <div class="rubric-list" id="rubricList"></div>
+                <div class="save-row">
+                  <span class="muted small" id="scoreProgress">0 of 4 rated</span>
+                  <button class="btn primary" data-action="save-score">Save rating</button>
+                </div>
+              </div>
+
+              <div class="sub-panel" data-sub="annotate">
+                <div class="photo-frame">
+                  <svg class="photo-base" viewBox="0 0 300 220" preserveAspectRatio="xMidYMid meet">
+                    <rect width="300" height="220" fill="var(--surface)"/>
+                    <line x1="20" y1="176" x2="280" y2="176" stroke="var(--border)" stroke-width="2"/>
+                    <path d="M110 176 C108 120 116 96 150 96 C184 96 192 120 190 176 Z" fill="none" stroke="var(--text-faint)" stroke-width="2"/>
+                    <ellipse cx="150" cy="96" rx="24" ry="7" fill="none" stroke="var(--text-faint)" stroke-width="2"/>
+                    <circle cx="205" cy="150" r="20" fill="none" stroke="var(--text-faint)" stroke-width="2"/>
+                    <circle cx="230" cy="168" r="13" fill="none" stroke="var(--text-faint)" stroke-width="2"/>
+                    <path d="M40 176 C60 150 90 158 100 176" fill="none" stroke="var(--text-faint)" stroke-width="1.6"/>
+                    <path d="M55 176 C68 160 84 164 92 176" fill="none" stroke="var(--text-faint)" stroke-width="1.2"/>
+                  </svg>
+                  <svg class="photo-overlay" id="overlaySvg" viewBox="0 0 300 220" preserveAspectRatio="xMidYMid meet">
+                    <defs>
+                      <marker id="arrowHead" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                        <path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/>
+                      </marker>
+                    </defs>
+                  </svg>
+                </div>
+                <div class="tool-meta">
+                  <span class="muted small" id="markCount">0 marks</span>
+                  <button class="link-btn" data-action="undo-mark">Undo</button>
+                </div>
+                <div class="tool-row" id="toolRow">
+                  <button class="tool-btn" data-tool="circle" data-action="tool"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg>Circle</button>
+                  <button class="tool-btn" data-tool="highlight" data-action="tool"><svg class="ic" viewBox="0 0 24 24"><rect x="4" y="9" width="16" height="6" rx="2"/></svg>Highlight</button>
+                  <button class="tool-btn" data-tool="arrow" data-action="tool"><svg class="ic" viewBox="0 0 24 24"><path d="M5 19 19 5"/><path d="M9 5h10v10"/></svg>Arrow</button>
+                  <button class="tool-btn" data-tool="freehand" data-action="tool"><svg class="ic" viewBox="0 0 24 24"><path d="M4 18c3-8 5-12 8-12s3 7 6 7 2-4 2-4"/></svg>Draw</button>
+                </div>
+
+                <div class="voice-card">
+                  <div class="voice-row">
+                    <button class="mic-btn" id="micBtn" data-action="record-toggle"><svg class="ic" viewBox="0 0 24 24" id="micIcon"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/></svg></button>
+                    <div class="voice-meta">
+                      <div class="waveform" id="waveform">
+                        <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+                      </div>
+                      <div class="voice-time" id="voiceTime">Tap to record</div>
+                    </div>
+                  </div>
+                  <div class="lang-row">
+                    <button class="lang-chip active" data-action="lang" data-lang="en">EN</button>
+                    <button class="lang-chip" data-action="lang" data-lang="hi">HI</button>
+                    <button class="lang-chip" data-action="lang" data-lang="te">TE</button>
+                  </div>
+                  <div class="transcript-box" id="transcriptBox" hidden>
+                    <div class="transcript-status" id="transcriptStatus">Transcribing…</div>
+                    <textarea id="transcriptText" rows="2"></textarea>
+                    <div class="transcript-meta" id="transcriptMeta">Confidence 92% · audio always kept</div>
+                  </div>
+                </div>
+                <button class="btn primary block" data-action="send-feedback">Send to <span id="sendName">Aarav</span></button>
+              </div>
+            </div>
+
+            <div class="scr" data-screen="dashboard">
+              <div class="dash-head">
+                <h2>Class VII-B</h2>
+                <span class="muted small">Semester 1 · Aug – Dec 2026</span>
+              </div>
+              <div class="stat-grid" id="statGrid"></div>
+              <h3 class="section-title">Student growth</h3>
+              <div class="student-chips" id="dashChips"></div>
+              <div class="chart-card">
+                <div class="chart-legend" id="chartLegend"></div>
+                <svg id="growthChart" viewBox="0 0 300 170"></svg>
+                <div class="chart-x-labels"><span>Aug</span><span>Oct</span><span>Dec</span></div>
+              </div>
+              <button class="btn ghost block" data-action="export-toggle">Export for parents</button>
+              <div class="export-panel" id="exportPanel" hidden>
+                <table>
+                  <thead><tr><th>Criterion</th><th>Aug → Dec</th><th>Δ</th></tr></thead>
+                  <tbody id="exportRows"></tbody>
+                </table>
+                <button class="btn primary" data-action="copy-summary">Copy summary</button>
+                <span class="muted small" id="copyState"></span>
+              </div>
+            </div>
+
+            <div class="scr" data-screen="peer">
+              <h2>Peer &amp; self review</h2>
+              <div id="peerWizard"></div>
+            </div>
+
+            <div class="scr" data-screen="portal">
+              <div class="portal-hero">
+                <div class="portal-avatar">AK</div>
+                <div>
+                  <h2>Aarav K.</h2>
+                  <span class="muted small">Class VII-B · Your growth, not your grade</span>
+                </div>
+              </div>
+              <div class="callout">
+                <svg class="ic" viewBox="0 0 24 24"><path d="M12 19V5"/><path d="m6 11 6-6 6 6"/></svg>
+                <div><strong>Technical skill grew the most</strong><span>3.0 → 4.4 this semester</span></div>
+              </div>
+              <div class="chart-card">
+                <div class="chart-legend" id="portalLegend"></div>
+                <svg id="portalChart" viewBox="0 0 300 170"></svg>
+                <div class="chart-x-labels"><span>Aug</span><span>Oct</span><span>Dec</span></div>
+              </div>
+              <h3 class="section-title">Your work</h3>
+              <div class="work-card">
+                <div class="work-thumb">
+                  <svg viewBox="0 0 300 220"><rect width="300" height="220" fill="var(--surface)"/><path d="M110 176 C108 120 116 96 150 96 C184 96 192 120 190 176 Z" fill="none" stroke="var(--text-faint)" stroke-width="4"/><circle cx="205" cy="150" r="20" fill="none" stroke="var(--text-faint)" stroke-width="4"/></svg>
+                </div>
+                <div class="work-info">
+                  <strong>Still life — pencil</strong>
+                  <span class="muted small">3 marks · feedback from your teacher</span>
+                  <div class="voice-mini">
+                    <button class="play-btn" data-action="play-voice"><svg class="ic" id="playIcon" viewBox="0 0 24 24" style="width:12px;height:12px;stroke-width:2.4"><path d="M8 5l11 7-11 7V5z"/></svg></button>
+                    <div class="mini-wave" id="miniWave"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+                    <span class="voice-len">0:24</span>
+                  </div>
+                  <div class="lang-row small">
+                    <button class="lang-chip active" data-action="portal-lang" data-lang="en">EN</button>
+                    <button class="lang-chip" data-action="portal-lang" data-lang="hi">HI</button>
+                    <button class="lang-chip" data-action="portal-lang" data-lang="te">TE</button>
+                  </div>
+                  <p class="transcript-quote" id="portalTranscript"></p>
+                </div>
+              </div>
+            </div>
+
+            <div class="scr" data-screen="profile-teacher">
+              <div class="profile-card">
+                <div class="portal-avatar">DT</div>
+                <h2>Demo Teacher</h2>
+                <span class="muted small">Teacher · Demo Government High School</span>
+              </div>
+              <dl class="profile-fields">
+                <div><dt>Language</dt><dd>Telugu (te)</dd></div>
+                <div><dt>Classes</dt><dd>Class VII-B</dd></div>
+                <div><dt>Phone</dt><dd>+91 99999 00001</dd></div>
+              </dl>
+              <p class="muted small">Auth is Firebase phone-OTP (Phase 1). Profile editing isn't in MVP scope.</p>
+            </div>
+
+            <div class="scr" data-screen="profile-student">
+              <div class="profile-card">
+                <div class="portal-avatar">AK</div>
+                <h2>Aarav K.</h2>
+                <span class="muted small">Student · Class VII-B</span>
+              </div>
+              <dl class="profile-fields">
+                <div><dt>Join code</dt><dd>7F3KQ2</dd></div>
+                <div><dt>Language</dt><dd>English (en)</dd></div>
+                <div><dt>Guardian</dt><dd>On file</dd></div>
+              </dl>
+              <p class="muted small">Students sign in with a class join code — no email or password.</p>
+            </div>
+
+          </div>
+
+          <div class="toast" id="toast"></div>
+          <div class="tab-bar" id="tabBar"></div>
+        </div>
+      </div>
+      <div class="stage-caption" id="stageCaption"></div>
+    </section>
+
+    <aside class="index" id="indexPanel">
+      <h2>Screens in this prototype</h2>
+      <p>Each one maps to a feature or component from the roadmap.</p>
+      <div id="indexList"></div>
+    </aside>
+  </main>
+
+  <footer class="research">
+    <div class="stat"><b>70</b><span>art educators studied, Telangana</span></div>
+    <div class="stat"><b>58%</b><span>cited limited documentation</span></div>
+    <div class="stat"><b>32%</b><span>cited time scarcity — 50+ students, two periods a week</span></div>
+    <div class="stat"><b>4</b><span>framework components → 5 MVP features</span></div>
+  </footer>
+  <p class="research-note">Prototype only — no data leaves this page. Built from <code>Startup_pitch_deck_Ganesh_Kumar_Malthurkar_guide_V2</code> and <code>ROADMAP.md</code>. Improvise from here.</p>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var svgNS = "http://www.w3.org/2000/svg";
+
+  var RUBRIC = [
+    {key:"composition", name:"Composition", color:"var(--accent)"},
+    {key:"colour", name:"Colour theory", color:"var(--marigold)"},
+    {key:"technical", name:"Technical skill", color:"var(--vermilion)"},
+    {key:"conceptual", name:"Conceptual depth", color:"var(--success)"}
+  ];
+
+  var LEVEL_LABELS = ["Emerging","Developing","Proficient","Advanced"];
+
+  var DESCRIPTORS = {
+    composition: [
+      "Elements are placed with little relationship to each other.",
+      "Some intentional arrangement; balance is inconsistent.",
+      "Clear focal point and a balanced arrangement.",
+      "Composition actively guides the viewer's eye."
+    ],
+    colour: [
+      "Colour is applied without a plan.",
+      "Some grouping of colour, limited contrast or harmony.",
+      "Colour relationships are deliberate and consistent.",
+      "Colour choices carry mood and depth confidently."
+    ],
+    technical: [
+      "Marks are tentative; medium is not yet controlled.",
+      "Growing control; technique is inconsistent across the piece.",
+      "Confident, controlled use of the medium throughout.",
+      "Technique is precise and used expressively, not just correctly."
+    ],
+    conceptual: [
+      "No clear idea beyond copying what is seen.",
+      "An idea is present but not carried through the piece.",
+      "A clear idea is visible and mostly sustained.",
+      "The idea is original and fully realised."
+    ]
+  };
+
+  var STUDENTS = [
+    {id:"aarav", name:"Aarav K.", status:"pending"},
+    {id:"diya", name:"Diya S.", status:"done"},
+    {id:"ishaan", name:"Ishaan R.", status:"pending"},
+    {id:"meera", name:"Meera T.", status:"done"},
+    {id:"rohan", name:"Rohan P.", status:"pending"}
+  ];
+
+  var BASE_GROWTH = {
+    composition:[3.4,3.8,4.1],
+    colour:[2.6,3.0,3.5],
+    technical:[3.0,3.7,4.4],
+    conceptual:[2.8,3.3,3.9]
+  };
+
+  var CLASS_AVG = {composition:3.6, colour:3.1, technical:3.8, conceptual:3.2};
+  var CLASS_DELTA = {composition:0.5, colour:0.6, technical:0.7, conceptual:0.5};
+
+  var TRANSCRIPTS = {
+    en: "Shading on the left is stronger — carry it across.",
+    hi: "बाईं ओर शेडिंग ज़्यादा अच्छी है — इसे पूरे चित्र में लाओ।",
+    te: "ఎడమ వైపు షేడింగ్ బాగుంది — దాన్ని మొత్తం బొమ్మలో వాడు."
+  };
+  var SPEECH_CODES = {en:"en-IN", hi:"hi-IN", te:"te-IN"};
+
+  var PEER_STEPS = [
+    {q:"Does the artwork use colour with intention?", prompt:"Add one thing about the colour choices."},
+    {q:"Does the composition lead your eye somewhere?", prompt:"Add one thing your classmate did well."},
+    {q:"Is the technique controlled and confident?", prompt:"Add one thing they could try next."},
+    {q:"Does the work show a clear idea or feeling?", prompt:"Add one word for the feeling it gives you."}
+  ];
+  var PEER_CHOICES = ["Yes, clearly","Partly","Not yet"];
+
+  var SCREENS = {
+    "home-teacher": {role:"teacher", tag:"C1–C4", title:"Classes", desc:"Teacher home — class roster and today’s assignment.", indexed:true},
+    "assess-rubric": {role:"teacher", tag:"F1", title:"Rubric scoring", desc:"Tap-to-rate against the visual rubric. Works offline.", indexed:true},
+    "assess-annotate": {role:"teacher", tag:"F2", title:"Annotate & voice", desc:"Mark up the photo and leave a trilingual voice note.", indexed:true},
+    "dashboard": {role:"teacher", tag:"F4", title:"Teacher dashboard", desc:"Growth curves per student, exportable for parents.", indexed:true},
+    "profile-teacher": {role:"teacher", tag:"—", title:"Teacher profile", desc:"Account details from the User entity.", indexed:false},
+    "peer": {role:"student", tag:"F3", title:"Peer & self review", desc:"Guided four-step form on the same rubric.", indexed:true},
+    "portal": {role:"student", tag:"F5", title:"My Work", desc:"The student’s own view — growth, not grades.", indexed:true},
+    "profile-student": {role:"student", tag:"—", title:"Student profile", desc:"Join code and language preference.", indexed:false}
+  };
+
+  var TABS = {
+    teacher: [
+      {key:"home-teacher", label:"Classes", icon:iconHome},
+      {key:"dashboard", label:"Dashboard", icon:iconChart},
+      {key:"profile-teacher", label:"Profile", icon:iconUser}
+    ],
+    student: [
+      {key:"portal", label:"My Work", icon:iconImages},
+      {key:"peer", label:"Review", icon:iconChat},
+      {key:"profile-student", label:"Profile", icon:iconUser}
+    ]
+  };
+
+  var state = {
+    role: "teacher",
+    screen: "home-teacher",
+    sub: "rubric",
+    currentStudentId: "aarav",
+    scores: {
+      aarav: {composition:null, colour:null, technical:null, conceptual:null},
+      diya: {composition:3, colour:3, technical:3, conceptual:2},
+      ishaan: {composition:null, colour:null, technical:null, conceptual:null},
+      meera: {composition:4, colour:3, technical:4, conceptual:3},
+      rohan: {composition:null, colour:null, technical:null, conceptual:null}
+    },
+    tool: "circle",
+    marks: [],
+    recording: false,
+    recordSeconds: 0,
+    recordInterval: null,
+    voiceLang: "en",
+    transcriptStage: "idle",
+    peerStep: 1,
+    peerChoice: {},
+    dashStudentId: "aarav",
+    dashVisible: {composition:true, colour:true, technical:true, conceptual:true},
+    portalVisible: {composition:true, colour:true, technical:true, conceptual:true},
+    exportOpen: false,
+    syncState: "offline",
+    portalPlaying: false,
+    portalLang: "en"
+  };
+
+  // ---------- icons ----------
+  function svgWrap(inner){ return '<svg class="ic" viewBox="0 0 24 24">' + inner + '</svg>'; }
+  function iconHome(){ return svgWrap('<path d="M4 11.5 12 4l8 7.5"/><path d="M6 10v9h12v-9"/>'); }
+  function iconChart(){ return svgWrap('<path d="M4 20V10"/><path d="M12 20V4"/><path d="M20 20v-7"/>'); }
+  function iconUser(){ return svgWrap('<circle cx="12" cy="8" r="3.4"/><path d="M5 20c1.2-4 4-6 7-6s5.8 2 7 6"/>'); }
+  function iconImages(){ return svgWrap('<rect x="4" y="5" width="13" height="13" rx="2"/><path d="M8 20h11a2 2 0 0 0 2-2V7"/>'); }
+  function iconChat(){ return svgWrap('<path d="M4 5h16v10H9l-4 4V5z"/><path d="m8.5 10 2 2 4-4"/>'); }
+  function iconChevron(){ return svgWrap('<path d="m9 5 7 7-7 7"/>'); }
+  function iconCloudOff(){ return svgWrap('<path d="M7 18a4 4 0 0 1-.6-7.95A5 5 0 0 1 16 8a3.5 3.5 0 0 1 1 6.9H8"/><path d="M3 3l18 18"/>'); }
+  function iconSync(){ return svgWrap('<path d="M4 12a8 8 0 0 1 14-5"/><path d="M18 4v4h-4"/><path d="M20 12a8 8 0 0 1-14 5"/><path d="M6 20v-4h4"/>'); }
+  function iconCloudCheck(){ return svgWrap('<path d="M7 18a4 4 0 0 1-.6-7.95A5 5 0 0 1 16 8a3.5 3.5 0 0 1 1 6.9H8"/><path d="m9.5 15 2 2 3.5-4"/>'); }
+  function iconCheck(){ return svgWrap('<path d="m5 12 5 5 9-10"/>'); }
+
+  // ---------- helpers ----------
+  function $(sel, root){ return (root||document).querySelector(sel); }
+  function $all(sel, root){ return Array.prototype.slice.call((root||document).querySelectorAll(sel)); }
+  function screenKey(){ return state.screen === "assess" ? "assess-" + state.sub : state.screen; }
+
+  function hashString(str){
+    var h = 0;
+    for (var i=0;i<str.length;i++){ h = (h*31 + str.charCodeAt(i)) >>> 0; }
+    return h;
+  }
+  function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
+  function studentData(studentId){
+    if (studentId === "aarav") return BASE_GROWTH;
+    var seed = hashString(studentId);
+    var out = {};
+    RUBRIC.forEach(function(crit, idx){
+      var offset = ((seed >> (idx*4)) % 9 - 4) / 10; // -0.4..0.4
+      out[crit.key] = BASE_GROWTH[crit.key].map(function(v){ return Math.round(clamp(v+offset,1,4)*10)/10; });
+    });
+    return out;
+  }
+
+  function showToast(msg){
+    var toast = $("#toast");
+    toast.textContent = msg;
+    toast.classList.add("show");
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(function(){ toast.classList.remove("show"); }, 2200);
+  }
+
+  // ---------- render: header ----------
+  function renderHeader(){
+    var key = screenKey();
+    var info = SCREENS[key];
+    var header = $("#appHeader");
+    if (state.screen === "assess"){
+      header.innerHTML =
+        '<div class="assess-head">' +
+          '<button class="icon-btn" data-action="goto" data-screen="home-teacher">' + iconChevronBack() + '</button>' +
+          '<div><strong id="assessName">' + labelFor(state.currentStudentId) + '</strong><span class="muted small">Still life — pencil</span></div>' +
+        '</div>' +
+        '<div class="subtabs">' +
+          '<button data-action="sub" data-sub="rubric" class="' + (state.sub==="rubric"?"active":"") + '">Rubric</button>' +
+          '<button data-action="sub" data-sub="annotate" class="' + (state.sub==="annotate"?"active":"") + '">Annotate &amp; voice</button>' +
+        '</div>';
+    } else {
+      header.innerHTML = '';
+    }
+  }
+  function iconChevronBack(){ return svgWrap('<path d="M15 5 8 12l7 7"/>'); }
+  function labelFor(id){ var s = STUDENTS.filter(function(x){return x.id===id;})[0]; return s ? s.name : id; }
+
+  // ---------- render: screen visibility ----------
+  function renderVisibility(){
+    $all(".scr").forEach(function(el){
+      el.hidden = el.getAttribute("data-screen") !== state.screen;
+    });
+    if (state.screen === "assess"){
+      $all(".sub-panel").forEach(function(el){
+        el.hidden = el.getAttribute("data-sub") !== state.sub;
+      });
+    }
+    $("#appBody").scrollTop = 0;
+  }
+
+  // ---------- render: tab bar ----------
+  function renderTabBar(){
+    var tabs = TABS[state.role];
+    var activeKey = state.screen === "assess" ? "home-teacher" : state.screen;
+    $("#tabBar").innerHTML = tabs.map(function(t){
+      return '<button data-action="goto" data-screen="' + t.key + '" class="' + (t.key===activeKey?"active":"") + '">' + t.icon() + '<span>' + t.label + '</span></button>';
+    }).join("");
+  }
+
+  // ---------- render: index panel + caption ----------
+  function renderIndex(){
+    var key = screenKey();
+    var list = Object.keys(SCREENS).filter(function(k){ return SCREENS[k].indexed; });
+    $("#indexList").innerHTML = list.map(function(k){
+      var info = SCREENS[k];
+      var active = k === key;
+      return '<button class="index-item ' + (active?"active":"") + '" data-action="goto-index" data-key="' + k + '">' +
+        '<span class="index-tag">' + info.tag + '</span>' +
+        '<span class="index-copy"><strong>' + info.title + '</strong><span>' + info.desc + '</span></span>' +
+      '</button>';
+    }).join("");
+
+    var info = SCREENS[key];
+    $("#stageCaption").innerHTML = '<span class="tag">' + info.tag + '</span><strong>' + info.title + '</strong><span>' + info.desc + '</span>';
+  }
+
+  // ---------- Classes ----------
+  function renderClasses(){
+    var done = STUDENTS.filter(function(s){ return s.status==="done"; }).length;
+    $("#assignProgress").style.width = Math.round(done/STUDENTS.length*100) + "%";
+    $("#assignProgressLabel").textContent = done + " of " + STUDENTS.length + " scored";
+    $("#studentList").innerHTML = STUDENTS.map(function(s){
+      var initials = s.name.split(" ").map(function(p){return p[0];}).join("").slice(0,2);
+      return '<button class="student-row" data-action="open-student" data-id="' + s.id + '">' +
+        '<span class="avatar">' + initials + '</span>' +
+        '<span class="name-wrap"><strong>' + s.name + '</strong></span>' +
+        '<span class="chip ' + (s.status==="done"?"done":"") + '">' + (s.status==="done"?"Scored":"Not yet") + '</span>' +
+        iconChevron() +
+      '</button>';
+    }).join("");
+    renderSyncPill();
+  }
+
+  function renderSyncPill(){
+    var pill = $("#syncPill");
+    pill.classList.remove("syncing","synced");
+    var icon, label;
+    if (state.syncState === "offline"){ icon = iconCloudOff(); label = "Offline"; }
+    else if (state.syncState === "syncing"){ icon = iconSync(); label = "Syncing…"; pill.classList.add("syncing"); }
+    else { icon = iconCloudCheck(); label = "Synced"; pill.classList.add("synced"); }
+    pill.innerHTML = icon + "<span>" + label + "</span>";
+  }
+
+  // ---------- Rubric ----------
+  function renderRubric(){
+    var scores = state.scores[state.currentStudentId];
+    $("#assessName") && ($("#assessName").textContent = labelFor(state.currentStudentId));
+    $("#sendName") && ($("#sendName").textContent = labelFor(state.currentStudentId).split(" ")[0]);
+
+    $("#rubricList").innerHTML = RUBRIC.map(function(crit){
+      var level = scores[crit.key];
+      var btns = [1,2,3,4].map(function(l){
+        return '<button data-action="score" data-crit="' + crit.key + '" data-level="' + l + '" class="' + (level===l?"active":"") + '">' + l + '</button>';
+      }).join("");
+      var label = level ? LEVEL_LABELS[level-1] : "Not rated";
+      var desc = level ? DESCRIPTORS[crit.key][level-1] : "Tap a level to see what it looks like.";
+      return '<div class="rubric-row">' +
+        '<div class="rubric-row-head"><strong>' + crit.name + '</strong><span class="rubric-level-label">' + label + '</span></div>' +
+        '<div class="level-btns">' + btns + '</div>' +
+        '<p class="descriptor">' + desc + '</p>' +
+      '</div>';
+    }).join("");
+
+    var rated = RUBRIC.filter(function(c){ return scores[c.key] != null; }).length;
+    $("#scoreProgress").textContent = rated + " of " + RUBRIC.length + " rated";
+  }
+
+  // ---------- Annotate ----------
+  var overlaySvg, dragging=false, dragTool=null, startPt=null, tempEl=null, freehandPts=[];
+
+  function toSvgPoint(svg, clientX, clientY){
+    var pt = svg.createSVGPoint();
+    pt.x = clientX; pt.y = clientY;
+    var ctm = svg.getScreenCTM();
+    if (!ctm) return {x:0,y:0};
+    var loc = pt.matrixTransform(ctm.inverse());
+    return {x: loc.x, y: loc.y};
+  }
+
+  function initAnnotate(){
+    overlaySvg = $("#overlaySvg");
+    overlaySvg.addEventListener("pointerdown", function(e){
+      if (overlaySvg.setPointerCapture) { try { overlaySvg.setPointerCapture(e.pointerId); } catch(err){} }
+      dragging = true;
+      dragTool = state.tool;
+      startPt = toSvgPoint(overlaySvg, e.clientX, e.clientY);
+      if (dragTool === "freehand"){
+        freehandPts = [startPt];
+        tempEl = document.createElementNS(svgNS, "polyline");
+        tempEl.setAttribute("points", startPt.x + "," + startPt.y);
+        tempEl.setAttribute("class", "mark mark-freehand");
+      } else if (dragTool === "circle"){
+        tempEl = document.createElementNS(svgNS, "circle");
+        tempEl.setAttribute("cx", startPt.x); tempEl.setAttribute("cy", startPt.y); tempEl.setAttribute("r", 4);
+        tempEl.setAttribute("class", "mark mark-circle");
+      } else if (dragTool === "highlight"){
+        tempEl = document.createElementNS(svgNS, "rect");
+        tempEl.setAttribute("x", startPt.x); tempEl.setAttribute("y", startPt.y);
+        tempEl.setAttribute("width", 1); tempEl.setAttribute("height", 1); tempEl.setAttribute("rx", 4);
+        tempEl.setAttribute("class", "mark mark-highlight");
+      } else {
+        tempEl = document.createElementNS(svgNS, "line");
+        tempEl.setAttribute("x1", startPt.x); tempEl.setAttribute("y1", startPt.y);
+        tempEl.setAttribute("x2", startPt.x); tempEl.setAttribute("y2", startPt.y);
+        tempEl.setAttribute("class", "mark mark-arrow");
+        tempEl.setAttribute("marker-end", "url(#arrowHead)");
+      }
+      overlaySvg.appendChild(tempEl);
+    });
+
+    overlaySvg.addEventListener("pointermove", function(e){
+      if (!dragging) return;
+      var p = toSvgPoint(overlaySvg, e.clientX, e.clientY);
+      if (dragTool === "freehand"){
+        freehandPts.push(p);
+        tempEl.setAttribute("points", freehandPts.map(function(pt){ return pt.x + "," + pt.y; }).join(" "));
+      } else if (dragTool === "circle"){
+        tempEl.setAttribute("r", Math.max(4, Math.hypot(p.x-startPt.x, p.y-startPt.y)));
+      } else if (dragTool === "highlight"){
+        var x = Math.min(p.x, startPt.x), y = Math.min(p.y, startPt.y);
+        tempEl.setAttribute("x", x); tempEl.setAttribute("y", y);
+        tempEl.setAttribute("width", Math.max(1, Math.abs(p.x-startPt.x)));
+        tempEl.setAttribute("height", Math.max(1, Math.abs(p.y-startPt.y)));
+      } else {
+        tempEl.setAttribute("x2", p.x); tempEl.setAttribute("y2", p.y);
+      }
+    });
+
+    function endDrag(){
+      if (!dragging) return;
+      dragging = false;
+      if (dragTool === "circle" && parseFloat(tempEl.getAttribute("r")) < 10) tempEl.setAttribute("r", 26);
+      if (dragTool === "highlight"){
+        var w = parseFloat(tempEl.getAttribute("width")), h = parseFloat(tempEl.getAttribute("height"));
+        if (w < 8 || h < 8){
+          tempEl.setAttribute("x", startPt.x-35); tempEl.setAttribute("y", startPt.y-12);
+          tempEl.setAttribute("width", 70); tempEl.setAttribute("height", 24);
+        }
+      }
+      if (dragTool === "arrow"){
+        var len = Math.hypot(parseFloat(tempEl.getAttribute("x2"))-startPt.x, parseFloat(tempEl.getAttribute("y2"))-startPt.y);
+        if (len < 10){ tempEl.setAttribute("x2", startPt.x+50); tempEl.setAttribute("y2", startPt.y); }
+      }
+      state.marks.push(tempEl);
+      tempEl = null;
+      renderMarkCount();
+    }
+    overlaySvg.addEventListener("pointerup", endDrag);
+    overlaySvg.addEventListener("pointercancel", endDrag);
+  }
+
+  function renderMarkCount(){
+    $("#markCount").textContent = state.marks.length + (state.marks.length===1 ? " mark" : " marks");
+  }
+  function renderTools(){
+    $all(".tool-btn").forEach(function(btn){
+      btn.classList.toggle("active", btn.getAttribute("data-tool") === state.tool);
+    });
+  }
+
+  // ---------- Voice recorder ----------
+  function renderVoice(){
+    var mic = $("#micBtn");
+    mic.classList.toggle("is-recording", state.recording);
+    $("#waveform").classList.toggle("recording", state.recording);
+    $all(".lang-chip[data-action='lang']").forEach(function(c){
+      c.classList.toggle("active", c.getAttribute("data-lang") === state.voiceLang);
+    });
+    if (state.recording){
+      var mm = Math.floor(state.recordSeconds/60), ss = state.recordSeconds%60;
+      $("#voiceTime").textContent = mm + ":" + (ss<10?"0":"")+ss;
+    } else if (state.transcriptStage === "idle"){
+      $("#voiceTime").textContent = "Tap to record";
+    }
+    var box = $("#transcriptBox");
+    if (state.transcriptStage === "idle"){
+      box.hidden = true;
+    } else {
+      box.hidden = false;
+      if (state.transcriptStage === "processing"){
+        $("#transcriptStatus").textContent = "Transcribing…";
+        $("#transcriptStatus").classList.remove("done");
+        $("#transcriptText").value = "";
+      } else {
+        $("#transcriptStatus").textContent = "Transcribed · Google Speech (" + SPEECH_CODES[state.voiceLang] + ")";
+        $("#transcriptStatus").classList.add("done");
+        $("#transcriptText").value = TRANSCRIPTS[state.voiceLang];
+      }
+    }
+  }
+
+  function toggleRecording(){
+    if (!state.recording){
+      state.recording = true;
+      state.recordSeconds = 0;
+      state.transcriptStage = "idle";
+      renderVoice();
+      state.recordInterval = setInterval(function(){
+        state.recordSeconds++;
+        renderVoice();
+      }, 1000);
+    } else {
+      state.recording = false;
+      clearInterval(state.recordInterval);
+      state.transcriptStage = "processing";
+      renderVoice();
+      setTimeout(function(){
+        state.transcriptStage = "done";
+        renderVoice();
+      }, 900);
+    }
+  }
+
+  // ---------- Peer wizard ----------
+  function renderPeer(){
+    var body = $("#peerWizard");
+    if (state.peerStep > PEER_STEPS.length){
+      body.innerHTML = '<div class="peer-done">' +
+        '<div class="check-ring">' + iconCheck() + '</div>' +
+        '<strong>Response recorded</strong>' +
+        '<span class="muted small">Your feedback was saved for this assignment.</span>' +
+        '<button class="btn primary" data-action="goto" data-screen="portal">Back to My Work</button>' +
+      '</div>';
+      return;
+    }
+    var idx = state.peerStep - 1;
+    var step = PEER_STEPS[idx];
+    var dots = PEER_STEPS.map(function(_, i){ return '<i class="' + (i<state.peerStep?"active":"") + '"></i>'; }).join("");
+    var choice = state.peerChoice[idx] || null;
+    var choices = PEER_CHOICES.map(function(c){
+      return '<button data-action="peer-choice" data-choice="' + c + '" class="' + (choice===c?"active":"") + '">' + c + '</button>';
+    }).join("");
+    body.innerHTML =
+      '<div class="peer-progress">' + dots + '</div>' +
+      '<span class="muted small">Step ' + state.peerStep + ' of ' + PEER_STEPS.length + '</span>' +
+      '<p style="font-size:14px;font-weight:600;margin:2px 0 0;">' + step.q + '</p>' +
+      '<div class="peer-choices">' + choices + '</div>' +
+      '<label class="muted small" for="peerText">' + step.prompt + '</label>' +
+      '<textarea class="peer-text" id="peerText" rows="2"></textarea>' +
+      '<div class="peer-nav">' +
+        (state.peerStep>1 ? '<button class="btn ghost" data-action="peer-back">Back</button>' : '') +
+        '<button class="btn primary" data-action="peer-next">' + (state.peerStep===PEER_STEPS.length?"Submit":"Next") + '</button>' +
+      '</div>';
+  }
+
+  // ---------- Charts ----------
+  function addEl(svg, tag, attrs){
+    var el = document.createElementNS(svgNS, tag);
+    Object.keys(attrs).forEach(function(k){ el.setAttribute(k, attrs[k]); });
+    svg.appendChild(el);
+    return el;
+  }
+
+  function drawGrowthChart(svg, data, visible){
+    svg.innerHTML = "";
+    var x0=26, x1=282, yTop=14, yBot=146, xs=[x0, (x0+x1)/2, x1];
+    function yFor(v){ return yBot - ((v-1)/3) * (yBot-yTop); }
+    for (var lvl=1; lvl<=4; lvl++){
+      var y = yFor(lvl);
+      addEl(svg, "line", {x1:x0, y1:y, x2:x1, y2:y, stroke:"var(--border)", "stroke-width":1});
+      addEl(svg, "text", {x:x0-6, y:y+3, "text-anchor":"end", "font-size":9, fill:"var(--text-faint)", "font-family":"var(--font-mono)"}).textContent = lvl;
+    }
+    RUBRIC.forEach(function(crit){
+      if (!visible[crit.key]) return;
+      var pts = data[crit.key];
+      var pointsAttr = pts.map(function(v,i){ return xs[i] + "," + yFor(v); }).join(" ");
+      addEl(svg, "polyline", {points:pointsAttr, fill:"none", stroke:crit.color, "stroke-width":2.5, "stroke-linecap":"round", "stroke-linejoin":"round"});
+      pts.forEach(function(v,i){ addEl(svg, "circle", {cx:xs[i], cy:yFor(v), r:3, fill:crit.color}); });
+      addEl(svg, "text", {x:xs[2]+5, y:yFor(pts[2])+3, "font-size":10, fill:crit.color, "font-family":"var(--font-mono)", "font-weight":600}).textContent = pts[2].toFixed(1);
+    });
+  }
+
+  function renderLegend(container, visible, prefix){
+    container.innerHTML = RUBRIC.map(function(crit){
+      var off = !visible[crit.key];
+      return '<button class="legend-chip ' + (off?"off":"") + '" data-action="' + prefix + '-toggle" data-crit="' + crit.key + '">' +
+        '<i style="background:' + crit.color + '"></i>' + crit.name + '</button>';
+    }).join("");
+  }
+
+  function renderDashboard(){
+    $("#statGrid").innerHTML = RUBRIC.map(function(crit){
+      return '<div class="stat-tile">' +
+        '<b>' + CLASS_AVG[crit.key].toFixed(1) + '</b>' +
+        '<span class="stat-label">' + crit.name + '</span>' +
+        '<span class="stat-delta">+' + CLASS_DELTA[crit.key].toFixed(1) + ' since Aug</span>' +
+      '</div>';
+    }).join("");
+
+    $("#dashChips").innerHTML = STUDENTS.map(function(s){
+      return '<button class="student-chip ' + (s.id===state.dashStudentId?"active":"") + '" data-action="dash-student" data-id="' + s.id + '">' + s.name + '</button>';
+    }).join("");
+
+    renderLegend($("#chartLegend"), state.dashVisible, "dash");
+    drawGrowthChart($("#growthChart"), studentData(state.dashStudentId), state.dashVisible);
+    renderExport();
+  }
+
+  function renderExport(){
+    var panel = $("#exportPanel");
+    panel.hidden = !state.exportOpen;
+    if (!state.exportOpen) return;
+    var data = studentData(state.dashStudentId);
+    $("#exportRows").innerHTML = RUBRIC.map(function(crit){
+      var vals = data[crit.key];
+      var delta = (vals[2]-vals[0]).toFixed(1);
+      return '<tr><td>' + crit.name + '</td><td>' + vals[0].toFixed(1) + ' → ' + vals[2].toFixed(1) + '</td><td class="delta">+' + delta + '</td></tr>';
+    }).join("");
+  }
+
+  function renderPortal(){
+    renderLegend($("#portalLegend"), state.portalVisible, "portal");
+    drawGrowthChart($("#portalChart"), BASE_GROWTH, state.portalVisible);
+    $("#portalTranscript").textContent = "“" + TRANSCRIPTS[state.portalLang] + "”";
+    $all(".lang-chip[data-action='portal-lang']").forEach(function(c){
+      c.classList.toggle("active", c.getAttribute("data-lang") === state.portalLang);
+    });
+  }
+
+  // ---------- role / clock ----------
+  function renderRole(){
+    $all("#roleToggle button").forEach(function(b){
+      b.classList.toggle("active", b.getAttribute("data-role") === state.role);
+    });
+  }
+
+  function tickClock(){
+    var d = new Date();
+    var h = d.getHours() % 12; if (h===0) h = 12;
+    var m = d.getMinutes();
+    $("#clock").textContent = h + ":" + (m<10?"0":"") + m;
+  }
+
+  // ---------- master render ----------
+  function renderAll(){
+    renderRole();
+    renderHeader();
+    renderVisibility();
+    renderTabBar();
+    renderIndex();
+    renderClasses();
+    renderRubric();
+    renderTools();
+    renderVoice();
+    renderMarkCount();
+    renderPeer();
+    renderDashboard();
+    renderPortal();
+  }
+
+  // ---------- actions ----------
+  function handleAction(el){
+    var action = el.getAttribute("data-action");
+    switch(action){
+      case "role": {
+        state.role = el.getAttribute("data-role");
+        state.screen = state.role === "teacher" ? "home-teacher" : "portal";
+        renderAll();
+        break;
+      }
+      case "goto": {
+        state.screen = el.getAttribute("data-screen");
+        renderAll();
+        break;
+      }
+      case "goto-index": {
+        var key = el.getAttribute("data-key");
+        var info = SCREENS[key];
+        state.role = info.role;
+        if (key.indexOf("assess-") === 0){
+          state.screen = "assess"; state.sub = key.replace("assess-", "");
+        } else {
+          state.screen = key;
+        }
+        renderAll();
+        break;
+      }
+      case "sub": {
+        state.sub = el.getAttribute("data-sub");
+        renderAll();
+        break;
+      }
+      case "open-student": {
+        state.currentStudentId = el.getAttribute("data-id");
+        state.screen = "assess"; state.sub = "rubric";
+        renderAll();
+        break;
+      }
+      case "score": {
+        var crit = el.getAttribute("data-crit"), level = parseInt(el.getAttribute("data-level"), 10);
+        state.scores[state.currentStudentId][crit] = level;
+        renderRubric();
+        break;
+      }
+      case "save-score": {
+        var s = STUDENTS.filter(function(x){ return x.id===state.currentStudentId; })[0];
+        s.status = "done";
+        showToast("Saved · offline, will sync");
+        renderClasses();
+        break;
+      }
+      case "tool": {
+        state.tool = el.getAttribute("data-tool");
+        renderTools();
+        break;
+      }
+      case "undo-mark": {
+        var last = state.marks.pop();
+        if (last && last.parentNode) last.parentNode.removeChild(last);
+        renderMarkCount();
+        break;
+      }
+      case "record-toggle": {
+        toggleRecording();
+        break;
+      }
+      case "lang": {
+        state.voiceLang = el.getAttribute("data-lang");
+        renderVoice();
+        break;
+      }
+      case "send-feedback": {
+        showToast("Sent to " + labelFor(state.currentStudentId).split(" ")[0]);
+        break;
+      }
+      case "sync-cycle": {
+        if (state.syncState === "syncing") break;
+        if (state.syncState === "offline"){
+          state.syncState = "syncing";
+          renderSyncPill();
+          setTimeout(function(){ state.syncState = "synced"; renderSyncPill(); }, 1200);
+        } else {
+          state.syncState = "offline";
+          renderSyncPill();
+        }
+        break;
+      }
+      case "peer-choice": {
+        state.peerChoice[state.peerStep-1] = el.getAttribute("data-choice");
+        renderPeer();
+        break;
+      }
+      case "peer-next": {
+        state.peerStep++;
+        renderPeer();
+        break;
+      }
+      case "peer-back": {
+        state.peerStep = Math.max(1, state.peerStep-1);
+        renderPeer();
+        break;
+      }
+      case "dash-student": {
+        state.dashStudentId = el.getAttribute("data-id");
+        renderDashboard();
+        break;
+      }
+      case "dash-toggle": {
+        var ck = el.getAttribute("data-crit");
+        state.dashVisible[ck] = !state.dashVisible[ck];
+        renderDashboard();
+        break;
+      }
+      case "portal-toggle": {
+        var pk = el.getAttribute("data-crit");
+        state.portalVisible[pk] = !state.portalVisible[pk];
+        renderPortal();
+        break;
+      }
+      case "export-toggle": {
+        state.exportOpen = !state.exportOpen;
+        renderExport();
+        break;
+      }
+      case "copy-summary": {
+        var data = studentData(state.dashStudentId);
+        var lines = ["ProgressFlow — " + labelFor(state.dashStudentId) + " · Class VII-B · Semester 1"];
+        RUBRIC.forEach(function(crit){
+          var v = data[crit.key];
+          lines.push(crit.name + ": " + v[0].toFixed(1) + " → " + v[2].toFixed(1));
+        });
+        var text = lines.join("\n");
+        if (navigator.clipboard && navigator.clipboard.writeText){
+          navigator.clipboard.writeText(text).then(function(){
+            $("#copyState").textContent = "Copied.";
+          }).catch(function(){ fallbackCopy(text); });
+        } else {
+          fallbackCopy(text);
+        }
+        break;
+      }
+      case "portal-lang": {
+        state.portalLang = el.getAttribute("data-lang");
+        renderPortal();
+        break;
+      }
+      case "play-voice": {
+        var wave = $("#miniWave");
+        if (state.portalPlaying) return;
+        state.portalPlaying = true;
+        wave.classList.add("playing");
+        setTimeout(function(){ wave.classList.remove("playing"); state.portalPlaying = false; }, 2600);
+        break;
+      }
+    }
+  }
+  function fallbackCopy(text){
+    var ta = document.createElement("textarea");
+    ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.focus(); ta.select();
+    $("#copyState").textContent = "Select and copy manually.";
+    setTimeout(function(){ document.body.removeChild(ta); }, 4000);
+  }
+
+  document.addEventListener("click", function(e){
+    var el = e.target.closest("[data-action]");
+    if (!el) return;
+    handleAction(el);
+  });
+
+  initAnnotate();
+  tickClock();
+  setInterval(tickClock, 30000);
+  renderAll();
+})();
+</script>
+
+</body>
+</html>

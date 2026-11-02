@@ -1,0 +1,58 @@
+{
+  "expo": {
+    "name": "ProgressFlow",
+    "slug": "progressflow",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "progressflow",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "in.ac.iith.des.progressflow",
+      "infoPlist": {
+        "NSCameraUsageDescription": "ProgressFlow uses the camera to photograph student artwork for assessment.",
+        "NSMicrophoneUsageDescription": "ProgressFlow records short voice comments as feedback on student work."
+      }
+    },
+    "android": {
+      "package": "in.ac.iith.des.progressflow",
+      "permissions": ["CAMERA", "RECORD_AUDIO"],
+      "allowBackup": false
+    },
+    "extra": {
+      "apiBaseUrl": "http://localhost:4000"
+    },
+    "plugins": [
+      [
+        "react-native-document-scanner-plugin",
+        {
+          "cameraPermission": "ProgressFlow scans student artwork with the camera."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "ProgressFlow imports artwork and reference images from your gallery.",
+          "cameraPermission": "ProgressFlow photographs student artwork."
+        }
+      ],
+      [
+        "expo-av",
+        {
+          "microphonePermission": "ProgressFlow records short voice comments as feedback on student work."
+        }
+      ],
+      "expo-secure-store",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ]
+    ]
+  }
+}

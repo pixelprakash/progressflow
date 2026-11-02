@@ -1,0 +1,365 @@
+// ProgressFlow data model. Mirrors packages/shared/src/entities.ts.
+//
+// Sync-friendly rules:
+//  - every table has a client-generatable `id` (uuid), `createdAt`, `updatedAt`,
+//    and a nullable `deletedAt` for soft deletes;
+//  - no server-generated keys on the write path;
+//  - `updatedAt` is the last-write-wins tiebreak used by the sync engine.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  teacher
+  student
+  admin
+}
+
+enum AssessorType {
+  teacher
+  self
+  peer
+}
+
+enum AssessmentKind {
+  sketch
+  regular
+  progress
+  portfolio
+}
+
+enum AttachmentKind {
+  image
+  file
+  link
+  note
+}
+
+enum TranscriptStatus {
+  pending
+  processing
+  done
+  failed
+}
+
+model School {
+  id        String    @id @default(uuid())
+  name      String
+  district  String    @default("")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  users    User[]
+  students Student[]
+  klasses  Klass[]
+  rubrics  Rubric[]
+}
+
+model User {
+  id           String    @id @default(uuid())
+  schoolId     String
+  role         UserRole
+  displayName  String
+  phone        String?   @unique
+  languagePref String    @default("en")
+  /// scrypt hash for web/mobile account login; null for users without a password
+  passwordHash String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  school       School  @relation(fields: [schoolId], references: [id])
+  klassesTaught Klass[]
+
+  @@index([schoolId])
+}
+
+model Student {
+  id           String    @id @default(uuid())
+  schoolId     String
+  displayName  String
+  joinCode     String    @unique
+  guardianName String    @default("")
+  rollNo       String    @default("")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  school       School          @relation(fields: [schoolId], references: [id])
+  enrollments  Enrollment[]
+  assessments  Assessment[]
+  consent      ConsentRecord[]
+  snapshots    ProgressSnapshot[]
+
+  @@index([schoolId])
+}
+
+model Klass {
+  id           String    @id @default(uuid())
+  schoolId     String
+  teacherId    String
+  name         String
+  grade        Int       @default(0)
+  section      String    @default("")
+  academicYear String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  school      School             @relation(fields: [schoolId], references: [id])
+  teacher     User               @relation(fields: [teacherId], references: [id])
+  enrollments Enrollment[]
+  assignments Assignment[]
+  snapshots   ProgressSnapshot[]
+
+  @@index([schoolId])
+  @@index([teacherId])
+}
+
+model Enrollment {
+  id        String    @id @default(uuid())
+  klassId   String
+  studentId String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  klass   Klass   @relation(fields: [klassId], references: [id])
+  student Student @relation(fields: [studentId], references: [id])
+
+  @@unique([klassId, studentId])
+}
+
+model Rubric {
+  id       String    @id @default(uuid())
+  schoolId String?
+  title    String
+  context  String    @default("")
+  language String    @default("en")
+  version  Int       @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+  archivedAt DateTime?
+
+  school      School?      @relation(fields: [schoolId], references: [id])
+  criteria    Criterion[]
+  assignments Assignment[]
+
+  @@index([schoolId])
+}
+
+model Criterion {
+  id       String   @id @default(uuid())
+  rubricId String
+  key      String
+  name     String
+  weight   Float    @default(1)
+  order    Int
+  /// PerformanceDescriptor[] (level, label, descriptor, exemplarImageKey)
+  descriptors Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  rubric Rubric @relation(fields: [rubricId], references: [id])
+
+  @@unique([rubricId, key])
+  @@index([rubricId])
+}
+
+model Assignment {
+  id        String    @id @default(uuid())
+  klassId   String
+  rubricId  String
+  title     String
+  medium    String    @default("")
+  dueOn     DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  klass       Klass        @relation(fields: [klassId], references: [id])
+  rubric      Rubric       @relation(fields: [rubricId], references: [id])
+  assessments Assessment[]
+
+  @@index([klassId])
+}
+
+model ConsentRecord {
+  id           String    @id @default(uuid())
+  studentId    String
+  guardianName String
+  scope        String[]
+  grantedAt    DateTime
+  revokedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  student Student @relation(fields: [studentId], references: [id])
+
+  @@index([studentId])
+}
+
+model Assessment {
+  id             String       @id @default(uuid())
+  assignmentId   String
+  studentId      String
+  assessorType   AssessorType
+  assessorId     String
+  kind           AssessmentKind @default(regular)
+  note           String         @default("")
+  submittedAt    DateTime?
+  serverSyncedAt DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  deletedAt      DateTime?
+
+  assignment      Assignment       @relation(fields: [assignmentId], references: [id])
+  student         Student          @relation(fields: [studentId], references: [id])
+  criterionScores CriterionScore[]
+  photos          ArtworkPhoto[]
+  voiceNotes      VoiceNote[]
+  attachments     FeedbackAttachment[]
+  reviewResponses ReviewResponse[]
+
+  @@index([assignmentId])
+  @@index([studentId])
+  @@index([assessorType, assessorId])
+}
+
+model CriterionScore {
+  id           String    @id @default(uuid())
+  assessmentId String
+  criterionKey String
+  level        Int
+  note         String    @default("")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  assessment Assessment @relation(fields: [assessmentId], references: [id])
+
+  @@unique([assessmentId, criterionKey])
+  @@index([assessmentId])
+}
+
+model ArtworkPhoto {
+  id           String    @id @default(uuid())
+  assessmentId String
+  storageKey   String
+  thumbKey     String?
+  width        Int
+  height       Int
+  /// CaptureQuality | null
+  quality      Json?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  assessment  Assessment   @relation(fields: [assessmentId], references: [id])
+  annotations Annotation[]
+
+  @@index([assessmentId])
+}
+
+model Annotation {
+  id           String    @id @default(uuid())
+  photoId      String
+  /// AnnotationStroke[]
+  strokes      Json
+  flattenedKey String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  photo ArtworkPhoto @relation(fields: [photoId], references: [id])
+
+  @@index([photoId])
+}
+
+model VoiceNote {
+  id                   String           @id @default(uuid())
+  assessmentId         String
+  storageKey           String
+  durationMs           Int
+  language             String
+  transcriptStatus     TranscriptStatus @default(pending)
+  transcript           String           @default("")
+  transcriptConfidence Float?
+  transcriptEdited     String?
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+  deletedAt            DateTime?
+
+  assessment Assessment @relation(fields: [assessmentId], references: [id])
+
+  @@index([assessmentId])
+}
+
+model ReviewResponse {
+  id           String    @id @default(uuid())
+  assessmentId String
+  promptKey    String
+  choice       String?
+  text         String    @default("")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  assessment Assessment @relation(fields: [assessmentId], references: [id])
+
+  @@index([assessmentId])
+}
+
+model ProgressSnapshot {
+  id           String   @id @default(uuid())
+  studentId    String
+  klassId      String
+  criterionKey String
+  period       String
+  meanLevel    Float
+  sampleSize   Int
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  deletedAt    DateTime?
+
+  student Student @relation(fields: [studentId], references: [id])
+  klass   Klass   @relation(fields: [klassId], references: [id])
+
+  @@unique([studentId, klassId, criterionKey, period])
+  @@index([studentId])
+}
+
+/// Server-side cursor bookkeeping for the sync engine (not synced to devices).
+model SyncCursor {
+  deviceId   String   @id
+  userId     String
+  lastPushAt DateTime @default(now())
+  lastPullAt DateTime @default(now())
+}
+
+model FeedbackAttachment {
+  id           String         @id @default(uuid())
+  assessmentId String
+  kind         AttachmentKind
+  title        String         @default("")
+  storageKey   String?
+  url          String?
+  text         String         @default("")
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  deletedAt    DateTime?
+
+  assessment Assessment @relation(fields: [assessmentId], references: [id])
+
+  @@index([assessmentId])
+}
