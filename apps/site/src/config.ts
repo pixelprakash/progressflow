@@ -8,6 +8,10 @@ export const site = {
   updated: '3 November 2026',
   /** Where the teacher dashboard is hosted. */
   appUrl: 'http://localhost:4000',
+  /** Students sign in here with the 6-character code their teacher gives them. */
+  get studentUrl() {
+    return `${this.appUrl.replace(/\/$/, '')}/student`;
+  },
   contactEmail: 'pilot@progressflow.example',
   /** Fill in once the institution and funder are confirmed. */
   affiliation: '',

@@ -98,6 +98,11 @@ export function App() {
               </a>
             </li>
             <li>
+              <a className="btn" href={site.studentUrl}>
+                Student portal
+              </a>
+            </li>
+            <li>
               <a className="btn" href={mailto}>
                 Ask for the Android app
               </a>
@@ -480,6 +485,18 @@ export function App() {
               </div>
             </details>
             <details>
+              <summary>How do students sign in?</summary>
+              <div className="body">
+                <p>
+                  With a 6-character code. The teacher finds each student’s code on the class page
+                  of the dashboard and can print or replace it. The student opens the{' '}
+                  <a href={site.studentUrl}>student portal</a> in any phone browser, types the code,
+                  and sees only their own work. They can review their own work and, if the teacher
+                  allows it, a classmate’s.
+                </p>
+              </div>
+            </details>
+            <details>
               <summary>Can I use my own rubric?</summary>
               <div className="body">
                 <p>
@@ -516,6 +533,10 @@ export function App() {
             </p>
             <p>
               If you already have an account, <a href={site.appUrl}>sign in to the dashboard</a>.
+            </p>
+            <p>
+              Students: open the <a href={site.studentUrl}>student portal</a> and type the
+              6-character code your teacher gave you.
             </p>
           </section>
         </main>
