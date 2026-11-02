@@ -1,5 +1,5 @@
-import { RUBRIC_GUIDES } from '@progressflow/shared';
 import type { TimePoint } from '@progressflow/shared';
+import { useLang } from '../i18n';
 
 const W = 720;
 const H = 280;
@@ -7,13 +7,19 @@ const PAD = { l: 36, r: 16, t: 14, b: 34 };
 
 /** Time-scaled lines for the four criteria on the 1–4 performance scale. */
 export function GrowthChart({ points, label }: { points: TimePoint[]; label: string }) {
-  if (points.length === 0) return <p className="muted">No scored work yet.</p>;
+  const { guides, lang } = useLang();
+  if (points.length === 0) return null;
   const ts = points.map((p) => new Date(p.t).getTime());
   const t0 = Math.min(...ts);
   const t1 = Math.max(...ts);
   const x = (t: number) =>
     t1 === t0 ? W / 2 : PAD.l + ((t - t0) / (t1 - t0)) * (W - PAD.l - PAD.r);
   const y = (v: number) => PAD.t + (1 - (v - 1) / 3) * (H - PAD.t - PAD.b);
+  const day = (iso: string) =>
+    new Date(iso).toLocaleDateString(lang === 'en' ? 'en-IN' : lang === 'hi' ? 'hi-IN' : 'te-IN', {
+      day: 'numeric',
+      month: 'short',
+    });
 
   return (
     <figure className="chart">
@@ -34,10 +40,10 @@ export function GrowthChart({ points, label }: { points: TimePoint[]; label: str
             textAnchor="middle"
             className="tick"
           >
-            {new Date(p.t).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+            {day(p.t)}
           </text>
         ))}
-        {RUBRIC_GUIDES.map((g) => {
+        {guides.map((g) => {
           const pts = points.flatMap((p) =>
             p.scores[g.key] === undefined
               ? []
@@ -53,16 +59,14 @@ export function GrowthChart({ points, label }: { points: TimePoint[]; label: str
                 strokeLinecap="round"
               />
               {pts.map(([cx, cy], i) => (
-                <circle key={i} cx={cx} cy={cy} r={4.5} stroke="none">
-                  <title>{`${g.name}: ${points[i]?.scores[g.key] ?? ''}`}</title>
-                </circle>
+                <circle key={i} cx={cx} cy={cy} r={4.5} stroke="none" />
               ))}
             </g>
           );
         })}
       </svg>
       <figcaption className="legend">
-        {RUBRIC_GUIDES.map((g) => (
+        {guides.map((g) => (
           <span key={g.key}>
             <i style={{ background: g.color }} />
             {g.name}

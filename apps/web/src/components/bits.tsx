@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
-import { RUBRIC_GUIDES } from '@progressflow/shared';
 import type { Scores, SubmissionSummary } from '@progressflow/shared';
-import { KIND_LABEL, fmt, fmtDate } from '../data';
+import { fmt, kindKey } from '../data';
+import { useLang } from '../i18n';
 
 export function Stat({
   label,
@@ -23,9 +23,10 @@ export function Stat({
 
 /** Four horizontal bars on the 1–4 scale, one per rubric criterion. */
 export function CriterionBars({ scores }: { scores: Scores }) {
+  const { guides } = useLang();
   return (
     <div className="bars">
-      {RUBRIC_GUIDES.map((g) => {
+      {guides.map((g) => {
         const v = scores[g.key];
         return (
           <div key={g.key} className="bar-row">
@@ -51,30 +52,33 @@ export function SubmissionCard({
   s: SubmissionSummary;
   showStudent?: boolean;
 }) {
-  const waiting = s.pageCount > 0 && Object.keys(s.scores).length < RUBRIC_GUIDES.length;
+  const { t, fmtDate, guides } = useLang();
+  const waiting = s.pageCount > 0 && Object.keys(s.scores).length < guides.length;
   return (
     <Link to={`/submissions/${s.id}`} className="card sub-card">
       <div className="thumb">
         {s.coverPageId ? (
           <img src={`/v1/media/page/${s.coverPageId}`} alt="" loading="lazy" />
         ) : (
-          <span className="muted small">No photo</span>
+          <span className="muted small">{t('common.noPhoto')}</span>
         )}
       </div>
       <div className="sub-meta">
-        <strong>{showStudent ? s.studentName : KIND_LABEL[s.kind]}</strong>
+        <strong>{showStudent ? s.studentName : t(kindKey(s.kind))}</strong>
         <span className="muted small">
-          {showStudent ? `${KIND_LABEL[s.kind]} · ` : ''}
+          {showStudent ? `${t(kindKey(s.kind))} · ` : ''}
           {s.classLabel} · {fmtDate(s.createdAt)}
         </span>
         <span className="row gap">
           {s.average !== null ? (
-            <span className="pill">{fmt(s.average)} avg</span>
+            <span className="pill">
+              {fmt(s.average)} {t('common.avg')}
+            </span>
           ) : (
-            <span className="pill warn">not scored</span>
+            <span className="pill warn">{t('common.notScored')}</span>
           )}
-          {waiting && <span className="pill warn">to evaluate</span>}
-          {s.pageCount > 1 && <span className="pill">{s.pageCount} images</span>}
+          {waiting && <span className="pill warn">{t('sub.toEvaluate')}</span>}
+          {s.pageCount > 1 && <span className="pill">{t('sub.images', { n: s.pageCount })}</span>}
         </span>
       </div>
     </Link>
@@ -82,11 +86,12 @@ export function SubmissionCard({
 }
 
 export function Loading({ error, loading }: { error: string; loading: boolean }) {
+  const { t } = useLang();
   if (error)
     return (
       <p className="error" role="alert">
         {error}
       </p>
     );
-  return loading ? <p className="muted">Loading…</p> : null;
+  return loading ? <p className="muted">{t('common.loading')}</p> : null;
 }

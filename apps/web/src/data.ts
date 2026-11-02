@@ -1,12 +1,17 @@
 import { useEffect, useState } from 'react';
+import type { TKey } from '@progressflow/shared';
 import { ApiError, api } from './api';
 import { useAuth } from './auth';
 
 /** Loads a dashboard endpoint; a 401 anywhere means the session ended, so go back to sign-in. */
-export function useApi<T>(path: string): { data: T | null; error: string; loading: boolean } {
+export function useApi<T>(
+  path: string,
+  onUnauthorized?: () => void,
+): { data: T | null; error: string; loading: boolean; reload: () => void } {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [tick, setTick] = useState(0);
   const { logout } = useAuth();
 
   useEffect(() => {
@@ -18,27 +23,19 @@ export function useApi<T>(path: string): { data: T | null; error: string; loadin
       .then((d) => live && setData(d))
       .catch((e: unknown) => {
         if (!live) return;
-        if (e instanceof ApiError && e.status === 401) void logout();
-        else setError(e instanceof Error ? e.message : 'Something went wrong');
+        if (e instanceof ApiError && e.status === 401) (onUnauthorized ?? (() => void logout()))();
+        else setError(e instanceof Error ? e.message : 'error');
       })
       .finally(() => live && setLoading(false));
     return () => {
       live = false;
     };
-  }, [path, logout]);
+    // eslint-disable-next-line
+  }, [path, logout, tick]);
 
-  return { data, error, loading };
+  return { data, error, loading, reload: () => setTick((n) => n + 1) };
 }
 
-export const KIND_LABEL: Record<string, string> = {
-  sketch: 'Sketch',
-  regular: 'Regular check',
-  progress: 'Progress check',
-  portfolio: 'Portfolio piece',
-};
-
+export const kindKey = (kind: string) => `kind.${kind}` as TKey;
 export const fmt = (n: number | null | undefined) =>
   n === null || n === undefined ? '—' : n.toFixed(1);
-
-export const fmtDate = (iso: string) =>
-  new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });

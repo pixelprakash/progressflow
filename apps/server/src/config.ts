@@ -19,6 +19,8 @@ const Env = z.object({
   SPEECH_MODEL: z.string().default('long'),
   JWT_SECRET: z.string().min(8),
   UPLOAD_DIR: z.string().optional(),
+  /** Scales the login rate limits. Leave at 1 except in automated tests. */
+  RATE_LIMIT_MULTIPLIER: z.coerce.number().min(1).default(1),
   /** Only needed if the web app is served from a different origin than the API. */
   WEB_ORIGIN: z.string().url().optional(),
 });

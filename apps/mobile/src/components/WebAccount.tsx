@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 import Constants from 'expo-constants';
 import { useAuth } from '../auth';
+import type { TKey } from '@progressflow/shared';
+import { useLang } from '../lang';
 import { useSync } from '../sync';
 import { theme } from '../theme';
 import { Btn, Chip, Icon } from './ui';
@@ -10,18 +12,23 @@ const DEFAULT_URL =
   (Constants.expoConfig?.extra as { apiBaseUrl?: string } | undefined)?.apiBaseUrl ??
   'http://localhost:4000';
 
-const STATUS_TEXT: Record<string, string> = {
-  idle: 'Up to date',
-  syncing: 'Syncing…',
-  offline: 'Waiting for a connection',
-  signin: 'Sign in again',
-  error: 'Needs attention',
+const STATUS_KEY: Record<string, TKey> = {
+  idle: 'm.web.idle',
+  syncing: 'm.web.syncing',
+  offline: 'm.web.offline',
+  signin: 'm.web.signin',
+  error: 'm.web.error',
 };
+
+/** Messages from the sync code are either dictionary keys (ours) or plain text (from the server). */
+const KEYED = /^(m|login)\.[\w.]+$/;
 
 /** Link this phone to the teacher's web account so classes and scans appear on a laptop. */
 export function WebAccount() {
   const { current } = useAuth();
   const sync = useSync();
+  const { t } = useLang();
+  const say = (m: string) => (KEYED.test(m) ? t(m as TKey) : m);
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [url, setUrl] = useState(DEFAULT_URL);
   const [mobile, setMobile] = useState(current?.phone.replace('+91', '') ?? '');
@@ -46,7 +53,7 @@ export function WebAccount() {
       <View style={s.box}>
         <View style={s.head}>
           <Icon name="laptop" size={22} color={theme.color.primary} />
-          <Text style={s.title}>Web account</Text>
+          <Text style={s.title}>{t('m.web.title')}</Text>
         </View>
         <Text style={s.line}>
           {sync.accountName} · {sync.serverUrl}
@@ -57,24 +64,24 @@ export function WebAccount() {
             (sync.status === 'error' || sync.status === 'signin') && { color: theme.color.danger },
           ]}
         >
-          {STATUS_TEXT[sync.status] ?? ''}
+          {STATUS_KEY[sync.status] ? t(STATUS_KEY[sync.status]!) : ''}
           {sync.pending > 0 && sync.status !== 'syncing'
-            ? ` · ${sync.pending} waiting to upload`
+            ? ` · ${t('m.web.pending', { n: sync.pending })}`
             : ''}
         </Text>
-        {sync.message ? <Text style={s.hint}>{sync.message}</Text> : null}
+        {sync.message ? <Text style={s.hint}>{say(sync.message)}</Text> : null}
         {sync.lastSyncAt ? (
           <Text style={s.hint}>
-            Last synced {new Date(sync.lastSyncAt).toLocaleString('en-IN')}
+            {t('m.web.last', { t: new Date(sync.lastSyncAt).toLocaleString() })}
           </Text>
         ) : null}
         <Btn
-          label="Sync now"
+          label={t('m.web.syncNow')}
           icon="sync"
           onPress={() => void sync.syncNow()}
           disabled={sync.status === 'syncing'}
         />
-        <Btn label="Unlink this phone" kind="ghost" onPress={() => void sync.unlink()} />
+        <Btn label={t('m.web.unlink')} kind="ghost" onPress={() => void sync.unlink()} />
       </View>
     );
   }
@@ -83,20 +90,17 @@ export function WebAccount() {
     <View style={s.box}>
       <View style={s.head}>
         <Icon name="laptop" size={22} color={theme.color.primary} />
-        <Text style={s.title}>Web account</Text>
+        <Text style={s.title}>{t('m.web.title')}</Text>
       </View>
-      <Text style={s.hint}>
-        See your classes, scans and scores on a laptop. Your data stays on this phone and uploads
-        when connected.
-      </Text>
+      <Text style={s.hint}>{t('m.web.intro')}</Text>
       <View style={{ flexDirection: 'row', gap: 8 }}>
         <Chip
-          label="I have an account"
+          label={t('m.web.have')}
           selected={mode === 'login'}
           onPress={() => setMode('login')}
         />
         <Chip
-          label="Create one"
+          label={t('m.web.createOne')}
           selected={mode === 'register'}
           onPress={() => setMode('register')}
         />
@@ -108,31 +112,31 @@ export function WebAccount() {
         autoCapitalize="none"
         autoCorrect={false}
         keyboardType="url"
-        placeholder="Server address"
+        placeholder={t('m.web.server')}
         placeholderTextColor={theme.color.textMuted}
-        accessibilityLabel="Server address"
+        accessibilityLabel={t('m.web.server')}
       />
       <TextInput
         style={s.input}
         value={mobile}
         onChangeText={(t) => setMobile(t.replace(/\D/g, '').slice(0, 10))}
         keyboardType="number-pad"
-        placeholder="10-digit mobile"
+        placeholder={t('m.auth.mobilePh')}
         placeholderTextColor={theme.color.textMuted}
-        accessibilityLabel="Mobile number"
+        accessibilityLabel={t('login.mobile')}
       />
       <TextInput
         style={s.input}
         value={password}
         onChangeText={setPassword}
         secureTextEntry
-        placeholder={mode === 'register' ? 'Choose a web password (8+ characters)' : 'Web password'}
+        placeholder={mode === 'register' ? t('m.web.pwNew') : t('m.web.pw')}
         placeholderTextColor={theme.color.textMuted}
-        accessibilityLabel="Web password"
+        accessibilityLabel={t('m.web.pw')}
       />
-      {error ? <Text style={s.error}>{error}</Text> : null}
+      {error ? <Text style={s.error}>{say(error)}</Text> : null}
       <Btn
-        label={mode === 'register' ? 'Create and link' : 'Sign in and link'}
+        label={mode === 'register' ? t('m.web.createLink') : t('m.web.signLink')}
         icon="link-variant"
         onPress={() => void connect()}
         disabled={busy}

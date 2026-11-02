@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { LANGUAGE_NAMES } from '@progressflow/shared';
+import type { Language } from '@progressflow/shared';
 import { classLabel, sortClasses } from '../domain';
-import { GUIDES } from '../rubricContent';
 import { useAuth } from '../auth';
+import { useLang } from '../lang';
 import { newId, useStore } from '../store';
 import { theme } from '../theme';
 import { Btn, Chip, Header, Icon, IconBtn, Sheet } from '../components/ui';
@@ -15,6 +17,7 @@ const SECTIONS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
 export function HomeScreen({ onOpenClass }: { onOpenClass: (id: string) => void }) {
   const { data, addClass, loadSample } = useStore();
   const { current, logout } = useAuth();
+  const { t, lang, setLang, guides } = useLang();
   const [profile, setProfile] = useState(false);
   const [adding, setAdding] = useState(false);
   const [grade, setGrade] = useState(6);
@@ -29,14 +32,14 @@ export function HomeScreen({ onOpenClass }: { onOpenClass: (id: string) => void 
       (sub) =>
         ids.has(sub.studentId) &&
         sub.pages.length > 0 &&
-        Object.keys(sub.scores).length < GUIDES.length,
+        Object.keys(sub.scores).length < guides.length,
     ).length;
     return { students: ids.size, waiting };
   };
 
   function create() {
     if (data.classes.some((c) => c.grade === grade && c.section === section)) {
-      Alert.alert('Already added', `Class ${grade}-${section} is already in your list.`);
+      Alert.alert(t('m.home.dupTitle'), t('m.home.dupBody', { label: `${grade}-${section}` }));
       return;
     }
     const first = data.classes[0];
@@ -53,30 +56,30 @@ export function HomeScreen({ onOpenClass }: { onOpenClass: (id: string) => void 
     <View style={s.root}>
       <Header
         title="ProgressFlow"
-        subtitle={current ? `${current.name} · ${current.school}` : 'Your classes'}
+        subtitle={current ? `${current.name} · ${current.school}` : t('m.home.classes')}
         right={
-          <IconBtn icon="account-circle-outline" label="Account" onPress={() => setProfile(true)} />
+          <IconBtn
+            icon="account-circle-outline"
+            label={t('m.home.account')}
+            onPress={() => setProfile(true)}
+          />
         }
       />
       <ScrollView contentContainerStyle={s.content}>
         {data.sample ? (
           <View style={s.demo}>
             <Icon name="information-outline" size={18} color={theme.color.warning} />
-            <Text style={s.demoText}>
-              Sample classes with made-up students. Tap a class to scan its artwork.
-            </Text>
+            <Text style={s.demoText}>{t('m.home.sampleBanner')}</Text>
           </View>
         ) : null}
 
         {classes.length === 0 && (
           <View style={s.empty}>
             <Icon name="school-outline" size={40} color={theme.color.textMuted} />
-            <Text style={s.grade}>No classes yet</Text>
-            <Text style={s.meta}>
-              Add a class, then add its students. Or look around with sample classes first.
-            </Text>
+            <Text style={s.grade}>{t('m.home.noClasses')}</Text>
+            <Text style={s.meta}>{t('m.home.noClassesBody')}</Text>
             <Btn
-              label="Try sample classes"
+              label={t('m.home.sample')}
               icon="flask-outline"
               kind="ghost"
               onPress={loadSample}
@@ -98,15 +101,13 @@ export function HomeScreen({ onOpenClass }: { onOpenClass: (id: string) => void 
                       style={s.card}
                       onPress={() => onOpenClass(c.id)}
                       accessibilityRole="button"
-                      accessibilityLabel={`Class ${classLabel(c)}`}
+                      accessibilityLabel={t('common.class', { label: classLabel(c) })}
                     >
                       <Text style={s.label}>{classLabel(c)}</Text>
-                      <Text style={s.meta}>
-                        {st.students} {st.students === 1 ? 'student' : 'students'}
-                      </Text>
+                      <Text style={s.meta}>{t('m.home.students', { n: st.students })}</Text>
                       {st.waiting > 0 ? (
                         <View style={s.badge}>
-                          <Text style={s.badgeText}>{st.waiting} to evaluate</Text>
+                          <Text style={s.badgeText}>{t('ov.waiting', { n: st.waiting })}</Text>
                         </View>
                       ) : (
                         <Text style={s.meta}> </Text>
@@ -118,23 +119,37 @@ export function HomeScreen({ onOpenClass }: { onOpenClass: (id: string) => void 
           </View>
         ))}
 
-        <Btn label="Add class" icon="plus" kind="outline" onPress={() => setAdding(true)} />
+        <Btn
+          label={t('m.home.addClass')}
+          icon="plus"
+          kind="outline"
+          onPress={() => setAdding(true)}
+        />
       </ScrollView>
 
-      <Sheet visible={profile} onClose={() => setProfile(false)} title="Your account">
+      <Sheet visible={profile} onClose={() => setProfile(false)} title={t('m.home.yourAccount')}>
         {current && (
           <>
             <Text style={s.grade}>{current.name}</Text>
             <Text style={s.meta}>{current.school}</Text>
             <Text style={s.meta}>{current.phone}</Text>
-            <Text style={s.meta}>
-              Data stays on this phone. The app locks itself after 5 minutes away.
-            </Text>
+            <Text style={s.meta}>{t('m.home.autoLock')}</Text>
           </>
         )}
+        <Text style={s.meta}>{t('m.home.appLang')}</Text>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          {(Object.keys(LANGUAGE_NAMES) as Language[]).map((l) => (
+            <Chip
+              key={l}
+              label={LANGUAGE_NAMES[l]}
+              selected={lang === l}
+              onPress={() => setLang(l)}
+            />
+          ))}
+        </View>
         <WebAccount />
         <Btn
-          label="Log out"
+          label={t('m.home.logout')}
           icon="logout"
           kind="outline"
           onPress={() => {
@@ -144,8 +159,8 @@ export function HomeScreen({ onOpenClass }: { onOpenClass: (id: string) => void 
         />
       </Sheet>
 
-      <Sheet visible={adding} onClose={() => setAdding(false)} title="Add a class">
-        <Text style={s.meta}>Grade</Text>
+      <Sheet visible={adding} onClose={() => setAdding(false)} title={t('m.home.addClassTitle')}>
+        <Text style={s.meta}>{t('m.home.grade')}</Text>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -155,7 +170,7 @@ export function HomeScreen({ onOpenClass }: { onOpenClass: (id: string) => void 
             <Chip key={g} label={String(g)} selected={grade === g} onPress={() => setGrade(g)} />
           ))}
         </ScrollView>
-        <Text style={s.meta}>Section</Text>
+        <Text style={s.meta}>{t('m.home.section')}</Text>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -165,7 +180,11 @@ export function HomeScreen({ onOpenClass }: { onOpenClass: (id: string) => void 
             <Chip key={x} label={x} selected={section === x} onPress={() => setSection(x)} />
           ))}
         </ScrollView>
-        <Btn label={`Add Class ${grade}-${section}`} icon="check" onPress={create} />
+        <Btn
+          label={t('m.home.addNamed', { label: `${grade}-${section}` })}
+          icon="check"
+          onPress={create}
+        />
       </Sheet>
     </View>
   );

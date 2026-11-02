@@ -21,9 +21,11 @@ import type {
   Language,
   PerformanceLevel,
 } from '@progressflow/shared';
-import { KIND_META, compositeScore, shortDate } from '../domain';
+import { KIND_META, compositeScore } from '../domain';
+import { levelLabel } from '@progressflow/shared';
+import type { TKey } from '@progressflow/shared';
+import { useLang } from '../lang';
 import type { Attachment, Page, Submission } from '../domain';
-import { GUIDES, LEVEL_LABELS } from '../rubricContent';
 import type { CriterionGuide } from '../rubricContent';
 import { useAuth } from '../auth';
 import { parseHttpUrl } from '../url';
@@ -73,6 +75,7 @@ export function EvaluateScreen({
   const [color, setColor] = useState(COLORS[0] ?? '#E53935');
   const [hint, setHint] = useState<CriterionGuide | null>(null);
   const { current: teacher } = useAuth();
+  const { t, lang: uiLang, guides, shortDate } = useLang();
   const [lang, setLang] = useState<Language>(teacher?.language ?? 'en');
   const [recording, setRecording] = useState(false);
   const [elapsed, setElapsed] = useState(0);
@@ -95,7 +98,7 @@ export function EvaluateScreen({
   if (!sub || !student)
     return (
       <View style={{ flex: 1 }}>
-        <Header title="Not found" onBack={onBack} />
+        <Header title={t('m.ev.notFound')} onBack={onBack} />
       </View>
     );
 
@@ -127,7 +130,7 @@ export function EvaluateScreen({
           quality: a.quality,
         });
       } catch {
-        Alert.alert('Could not read that image', 'Try scanning it again.');
+        Alert.alert(t('m.ev.readFail'), t('m.ev.tryAgain'));
       }
     }
     if (added.length) {
@@ -138,8 +141,7 @@ export function EvaluateScreen({
 
   async function startRec() {
     const perm = await Audio.requestPermissionsAsync();
-    if (!perm.granted)
-      return Alert.alert('Microphone needed', 'Allow microphone access to record a voice note.');
+    if (!perm.granted) return Alert.alert(t('m.ev.micTitle'), t('m.ev.micBody'));
     await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
     const { recording: r } = await Audio.Recording.createAsync(
       Audio.RecordingOptionsPresets.HIGH_QUALITY,
@@ -199,7 +201,7 @@ export function EvaluateScreen({
     for (const a of res.assets)
       addAttachment({
         kind: 'image',
-        title: a.fileName ?? 'Reference image',
+        title: a.fileName ?? t('m.ev.refImage'),
         uri: await persistMedia(a.uri, 'attachments', 'jpg'),
       });
   }
@@ -223,10 +225,7 @@ export function EvaluateScreen({
   function saveLink() {
     const parsed = parseHttpUrl(draftB);
     if (!parsed || !parsed.host.includes('.')) {
-      Alert.alert(
-        'That link does not look right',
-        'Example: youtube.com/watch?v=… or https://example.org/lesson',
-      );
+      Alert.alert(t('m.ev.linkBadTitle'), t('m.ev.linkBadBody'));
       return;
     }
     addAttachment({ kind: 'link', title: draftA.trim() || parsed.host, url: parsed.url });
@@ -247,9 +246,15 @@ export function EvaluateScreen({
     <View style={s.root}>
       <Header
         title={student.name}
-        subtitle={`Roll ${student.rollNo} · ${shortDate(sub.createdAt)}`}
+        subtitle={`${t('common.roll', { n: student.rollNo })} · ${shortDate(sub.createdAt)}`}
         onBack={onBack}
-        right={<IconBtn icon="chart-line" label="Progress" onPress={() => onStudent(student.id)} />}
+        right={
+          <IconBtn
+            icon="chart-line"
+            label={t('m.ev.progress')}
+            onPress={() => onStudent(student.id)}
+          />
+        }
       />
       <ScrollView
         scrollEnabled={!drawing}
@@ -264,7 +269,7 @@ export function EvaluateScreen({
           {(Object.keys(KIND_META) as AssessmentKind[]).map((k) => (
             <Chip
               key={k}
-              label={KIND_META[k].label}
+              label={t(`kind.${k}`)}
               icon={KIND_META[k].icon}
               selected={sub.kind === k}
               onPress={() => edit((x) => ({ ...x, kind: k }))}
@@ -293,7 +298,7 @@ export function EvaluateScreen({
         ) : (
           <View style={s.noPhoto}>
             <Icon name="image-off-outline" size={36} color={theme.color.textMuted} />
-            <Text style={s.meta}>No photo on this record (sample data).</Text>
+            <Text style={s.meta}>{t('sub.noPhoto')}</Text>
           </View>
         )}
 
@@ -308,19 +313,19 @@ export function EvaluateScreen({
                 key={p.id}
                 onPress={() => setPageIdx(i)}
                 style={[s.thumb, i === pageIdx && s.thumbSel]}
-                accessibilityLabel={`Image ${i + 1}`}
+                accessibilityLabel={t('m.ev.imageN', { n: i + 1 })}
               >
                 <Image source={{ uri: p.uri }} style={{ flex: 1 }} />
               </Pressable>
             ))}
             <IconBtn
               icon="camera-plus-outline"
-              label="Scan"
+              label={t('m.ev.scan')}
               onPress={() => void scanPages().then(addPages)}
             />
             <IconBtn
               icon="image-plus"
-              label="Gallery"
+              label={t('m.ev.galleryBtn')}
               onPress={() => void pickFromGallery().then(addPages)}
             />
           </ScrollView>
@@ -341,33 +346,33 @@ export function EvaluateScreen({
                   if (!v) setDrawing(false);
                 }}
                 trackColor={{ true: theme.color.primary, false: theme.color.border }}
-                accessibilityLabel="Show or hide markup"
+                accessibilityLabel={t('m.ev.toggle')}
               />
               <View style={{ flex: 1 }} />
               <Chip
-                label={drawing ? 'Done' : 'Mark up'}
+                label={drawing ? t('m.ev.done') : t('m.ev.markUp')}
                 icon={drawing ? 'check' : 'draw'}
                 selected={drawing}
                 onPress={() => {
                   if (showMarks) setDrawing((d) => !d);
-                  else Alert.alert('Markup is hidden', 'Turn the switch on to draw.');
+                  else Alert.alert(t('sub.markHidden'), t('m.ev.markHiddenBody'));
                 }}
               />
             </View>
             {drawing && (
               <View style={s.tools}>
-                {TOOLS.map((t) => (
+                {TOOLS.map((tl) => (
                   <IconBtn
-                    key={t.tool}
-                    icon={t.icon}
-                    label={t.label}
-                    active={tool === t.tool}
-                    onPress={() => setTool(t.tool)}
+                    key={tl.tool}
+                    icon={tl.icon}
+                    label={t(`m.ev.${tl.tool === 'freehand' ? 'pen' : tl.tool}` as TKey)}
+                    active={tool === tl.tool}
+                    onPress={() => setTool(tl.tool)}
                   />
                 ))}
                 <IconBtn
                   icon="undo"
-                  label="Undo"
+                  label={t('m.ev.undo')}
                   disabled={!strokes.length}
                   onPress={() =>
                     page &&
@@ -379,7 +384,7 @@ export function EvaluateScreen({
                 />
                 <IconBtn
                   icon="delete-sweep-outline"
-                  label="Clear"
+                  label={t('m.ev.clear')}
                   disabled={!strokes.length}
                   onPress={() =>
                     page && edit((x) => ({ ...x, strokes: { ...x.strokes, [page.id]: [] } }))
@@ -390,7 +395,7 @@ export function EvaluateScreen({
                     <Pressable
                       key={c}
                       onPress={() => setColor(c)}
-                      accessibilityLabel={`Colour ${c}`}
+                      accessibilityLabel={t('m.ev.colour', { c })}
                       style={[s.dot, { backgroundColor: c }, c === color && s.dotSel]}
                     />
                   ))}
@@ -402,13 +407,13 @@ export function EvaluateScreen({
 
         <View style={s.tabs}>
           <Chip
-            label="Rubric"
+            label={t('sub.rubric')}
             icon="clipboard-list-outline"
             selected={tab === 'rubric'}
             onPress={() => setTab('rubric')}
           />
           <Chip
-            label="Feedback"
+            label={t('m.ev.tabFeedback')}
             icon="message-text-outline"
             selected={tab === 'feedback'}
             onPress={() => setTab('feedback')}
@@ -418,11 +423,12 @@ export function EvaluateScreen({
         {tab === 'rubric' ? (
           <View style={s.pad}>
             <Text style={s.meta}>
-              {scored} of {GUIDES.length} scored{avg !== null ? ` · average ${avg.toFixed(1)}` : ''}
-              . Tap <Text style={{ fontWeight: '700' }}>Hint</Text> on any row to see what to look
-              for.
+              {avg !== null
+                ? t('m.ev.scoredAvg', { n: scored, m: guides.length, avg: avg.toFixed(1) })
+                : t('m.ev.scored', { n: scored, m: guides.length })}
+              . {t('m.ev.hintTip')}
             </Text>
-            {GUIDES.map((g) => {
+            {guides.map((g) => {
               const level = sub.scores[g.key];
               const prev = previous.find((p) => p.scores[g.key] !== undefined);
               const prevLevel = prev?.scores[g.key];
@@ -440,7 +446,7 @@ export function EvaluateScreen({
                     </View>
                     <IconBtn
                       icon="lightbulb-on-outline"
-                      label="Hint"
+                      label={t('rv.hint')}
                       onPress={() => setHint(g)}
                       color={g.color}
                     />
@@ -451,7 +457,7 @@ export function EvaluateScreen({
                         key={l}
                         onPress={() => setScore(g.key, l)}
                         accessibilityRole="button"
-                        accessibilityLabel={`${g.name} ${LEVEL_LABELS[l]}`}
+                        accessibilityLabel={`${g.name} ${levelLabel(uiLang, l)}`}
                         accessibilityState={{ selected: level === l }}
                         style={[
                           s.level,
@@ -463,13 +469,13 @@ export function EvaluateScreen({
                           style={[s.levelLabel, level === l && { color: '#fff' }]}
                           numberOfLines={1}
                         >
-                          {LEVEL_LABELS[l]}
+                          {levelLabel(uiLang, l)}
                         </Text>
                       </Pressable>
                     ))}
                   </View>
                   <Text style={s.descriptor}>
-                    {level ? g.levels[level] : 'Not scored yet. Open the hint if you are unsure.'}
+                    {level ? g.levels[level] : t('m.ev.notScoredYet')}
                   </Text>
                   {delta !== null && prev && (
                     <Text
@@ -485,8 +491,15 @@ export function EvaluateScreen({
                         },
                       ]}
                     >
-                      {delta > 0 ? `▲ +${delta}` : delta < 0 ? `▼ ${delta}` : '● same'} since{' '}
-                      {shortDate(prev.createdAt)}
+                      {t('m.ev.since', {
+                        delta:
+                          delta > 0
+                            ? `▲ +${delta}`
+                            : delta < 0
+                              ? `▼ ${delta}`
+                              : `● ${t('m.ev.same')}`,
+                        date: shortDate(prev.createdAt),
+                      })}
                     </Text>
                   )}
                 </View>
@@ -496,7 +509,7 @@ export function EvaluateScreen({
         ) : (
           <View style={s.pad}>
             <View style={s.card}>
-              <Text style={s.cardTitle}>Voice note</Text>
+              <Text style={s.cardTitle}>{t('sub.voice')}</Text>
               <View style={{ flexDirection: 'row', gap: 8 }}>
                 {LANGS.map((l) => (
                   <Chip
@@ -516,7 +529,7 @@ export function EvaluateScreen({
               </View>
               {recording ? (
                 <Btn
-                  label={`Stop · ${fmt(elapsed)}`}
+                  label={t('m.ev.stop', { t: fmt(elapsed) })}
                   icon="stop-circle-outline"
                   kind="danger"
                   onPress={() => void stopRec()}
@@ -525,13 +538,17 @@ export function EvaluateScreen({
                 <View style={{ gap: 8 }}>
                   <View style={{ flexDirection: 'row', gap: 8 }}>
                     <Btn
-                      label={`${playing ? 'Stop' : 'Play'} · ${fmt(sub.voice.durationMs)}`}
+                      label={
+                        playing
+                          ? t('m.ev.stop', { t: fmt(sub.voice.durationMs) })
+                          : t('m.ev.play', { t: fmt(sub.voice.durationMs) })
+                      }
                       icon={playing ? 'stop' : 'play'}
                       onPress={() => void togglePlay()}
                       flex
                     />
                     <Btn
-                      label="Re-record"
+                      label={t('m.ev.rerecord')}
                       icon="microphone"
                       kind="outline"
                       onPress={() => void startRec()}
@@ -539,33 +556,31 @@ export function EvaluateScreen({
                     />
                   </View>
                   <Pressable onPress={() => edit((x) => ({ ...x, voice: null }))} hitSlop={8}>
-                    <Text style={s.link}>Delete voice note</Text>
+                    <Text style={s.link}>{t('m.ev.deleteVoice')}</Text>
                   </Pressable>
                 </View>
               ) : (
-                <Btn label="Record voice note" icon="microphone" onPress={() => void startRec()} />
+                <Btn label={t('m.ev.record')} icon="microphone" onPress={() => void startRec()} />
               )}
-              <Text style={s.meta}>
-                Saved on this phone. Automatic transcripts arrive with the sync phase.
-              </Text>
+              <Text style={s.meta}>{t('m.ev.voiceSaved')}</Text>
             </View>
 
             <View style={s.card}>
-              <Text style={s.cardTitle}>References, links and notes for the student</Text>
+              <Text style={s.cardTitle}>{t('m.ev.attachTitle')}</Text>
               <View style={s.attachBtns}>
                 <IconBtn
                   icon="image-multiple-outline"
-                  label="Image"
+                  label={t('m.ev.image')}
                   onPress={() => void addReferenceImages()}
                 />
                 <IconBtn
                   icon="file-document-outline"
-                  label="File"
+                  label={t('m.ev.file')}
                   onPress={() => void addFiles()}
                 />
                 <IconBtn
                   icon="link-variant"
-                  label="Link"
+                  label={t('m.ev.link')}
                   onPress={() => {
                     setDraftA('');
                     setDraftB('');
@@ -574,14 +589,14 @@ export function EvaluateScreen({
                 />
                 <IconBtn
                   icon="note-text-outline"
-                  label="Note"
+                  label={t('m.ev.note')}
                   onPress={() => {
                     setDraftA('');
                     setNoteSheet(true);
                   }}
                 />
               </View>
-              {sub.attachments.length === 0 && <Text style={s.meta}>Nothing attached yet.</Text>}
+              {sub.attachments.length === 0 && <Text style={s.meta}>{t('m.ev.nothing')}</Text>}
               {sub.attachments.map((a) => (
                 <View key={a.id} style={s.attRow}>
                   {a.kind === 'image' && a.uri ? (
@@ -626,7 +641,7 @@ export function EvaluateScreen({
                   </Pressable>
                   <IconBtn
                     icon="close"
-                    label="Remove"
+                    label={t('m.ev.remove')}
                     onPress={() =>
                       edit((x) => ({
                         ...x,
@@ -639,13 +654,13 @@ export function EvaluateScreen({
             </View>
 
             <View style={s.card}>
-              <Text style={s.cardTitle}>Your notes</Text>
+              <Text style={s.cardTitle}>{t('m.ev.yourNotes')}</Text>
               <TextInput
                 style={s.input}
                 multiline
                 value={sub.note}
-                onChangeText={(t) => edit((x) => ({ ...x, note: t }))}
-                placeholder="What to remember, or what to tell the student…"
+                onChangeText={(text) => edit((x) => ({ ...x, note: text }))}
+                placeholder={t('m.ev.notesPh')}
                 placeholderTextColor={theme.color.textMuted}
                 textAlignVertical="top"
               />
@@ -659,7 +674,7 @@ export function EvaluateScreen({
           <>
             <HintDiagram kind={hint.key} />
             <Text style={s.descriptor}>{hint.tagline}</Text>
-            <Text style={s.sheetH}>Look for</Text>
+            <Text style={s.sheetH}>{t('m.ev.lookFor')}</Text>
             {hint.lookFor.map((l) => (
               <View key={l.title} style={{ flexDirection: 'row', gap: 10 }}>
                 <Icon name="eye-outline" color={hint.color} size={20} />
@@ -669,33 +684,31 @@ export function EvaluateScreen({
                 </Text>
               </View>
             ))}
-            <Text style={s.sheetH}>Ask the student</Text>
+            <Text style={s.sheetH}>{t('m.ev.askStudent')}</Text>
             <Text style={s.descriptor}>“{hint.askStudent}”</Text>
-            <Text style={s.sheetH}>What each level looks like</Text>
+            <Text style={s.sheetH}>{t('m.ev.levelsLook')}</Text>
             {LEVELS.map((l) => (
               <View key={l} style={{ flexDirection: 'row', gap: 10 }}>
                 <View style={[s.lvBadge, { backgroundColor: hint.color }]}>
                   <Text style={s.lvBadgeText}>{l}</Text>
                 </View>
                 <Text style={[s.descriptor, { flex: 1 }]}>
-                  <Text style={{ fontWeight: '700' }}>{LEVEL_LABELS[l]}. </Text>
+                  <Text style={{ fontWeight: '700' }}>{levelLabel(uiLang, l)}. </Text>
                   {hint.levels[l]}
                 </Text>
               </View>
             ))}
-            <Text style={s.meta}>
-              Draft wording — to be replaced with educator-written descriptors and example images.
-            </Text>
+            <Text style={s.meta}>{t('m.ev.draftNote')}</Text>
           </>
         )}
       </Sheet>
 
-      <Sheet visible={linkSheet} onClose={() => setLinkSheet(false)} title="Add a link">
+      <Sheet visible={linkSheet} onClose={() => setLinkSheet(false)} title={t('m.ev.addLink')}>
         <TextInput
           style={s.inputLine}
           value={draftA}
           onChangeText={setDraftA}
-          placeholder="Title (optional)"
+          placeholder={t('m.ev.titlePh')}
           placeholderTextColor={theme.color.textMuted}
         />
         <TextInput
@@ -709,25 +722,25 @@ export function EvaluateScreen({
           keyboardType="url"
         />
         <Btn
-          label="Add link"
+          label={t('m.ev.addLinkBtn')}
           icon="link-variant-plus"
           onPress={saveLink}
           disabled={!draftB.trim()}
         />
       </Sheet>
 
-      <Sheet visible={noteSheet} onClose={() => setNoteSheet(false)} title="Add a note">
+      <Sheet visible={noteSheet} onClose={() => setNoteSheet(false)} title={t('m.ev.addNote')}>
         <TextInput
           style={[s.input, { minHeight: 140 }]}
           multiline
           value={draftA}
           onChangeText={setDraftA}
-          placeholder="Type or paste text for the student…"
+          placeholder={t('m.ev.notePh')}
           placeholderTextColor={theme.color.textMuted}
           textAlignVertical="top"
         />
         <Btn
-          label="Add note"
+          label={t('m.ev.addNoteBtn')}
           icon="note-plus-outline"
           onPress={saveNote}
           disabled={!draftA.trim()}

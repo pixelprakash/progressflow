@@ -14,6 +14,15 @@ import * as ImagePicker from 'expo-image-picker';
  */
 export const MAX_PAGES = 30;
 
+/** Shown when the scanner is missing; kept current by the language layer. */
+let notice = {
+  title: 'Scanner unavailable',
+  body: 'Using the basic camera instead. Edge detection needs Google Play services.',
+};
+export const setScanNotice = (n: { title: string; body: string }) => {
+  notice = n;
+};
+
 export async function scanPages(maxPages = MAX_PAGES): Promise<string[]> {
   try {
     const res = await DocumentScanner.scanDocument({
@@ -24,10 +33,7 @@ export async function scanPages(maxPages = MAX_PAGES): Promise<string[]> {
     if (res.status !== ScanDocumentResponseStatus.Success) return [];
     return res.scannedImages ?? [];
   } catch {
-    Alert.alert(
-      'Scanner unavailable',
-      'Using the basic camera instead. Edge detection needs Google Play services.',
-    );
+    Alert.alert(notice.title, notice.body);
     return basicCamera();
   }
 }

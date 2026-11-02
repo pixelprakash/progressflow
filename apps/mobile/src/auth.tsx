@@ -12,7 +12,7 @@ import { AppState } from 'react-native';
 import * as Crypto from 'expo-crypto';
 import * as FileSystem from 'expo-file-system';
 import * as SecureStore from 'expo-secure-store';
-import type { Language } from '@progressflow/shared';
+import type { Language, TKey } from '@progressflow/shared';
 
 /**
  * Local teacher accounts (offline-first). The PIN hash lives in the platform
@@ -43,7 +43,8 @@ export interface RegisterInput {
   pin: string;
 }
 
-export type LoginResult = { ok: true } | { ok: false; message: string };
+/** A failed sign-in carries a dictionary key (and a number to put in it); the screen translates it. */
+export type LoginResult = { ok: true } | { ok: false; key: TKey; n?: number };
 
 const BASE = `${FileSystem.documentDirectory ?? ''}progressflow/`;
 const ACCOUNTS_FILE = `${BASE}accounts.json`;
@@ -176,7 +177,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(
     async (id: string, pin: string): Promise<LoginResult> => {
       const teacher = accounts.find((t) => t.id === id);
-      if (!teacher) return { ok: false, message: 'Account not found.' };
+      if (!teacher) return { ok: false, key: 'm.web.errApp' };
 
       const lockKey = keyOf('pf_lock', id);
       const lock = JSON.parse(
@@ -188,7 +189,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (lock.until > Date.now()) {
         return {
           ok: false,
-          message: `Too many tries. Wait ${Math.ceil((lock.until - Date.now()) / 1000)} s.`,
+          key: 'm.auth.errLocked',
+          n: Math.ceil((lock.until - Date.now()) / 1000),
         };
       }
 
@@ -211,12 +213,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         lockKey,
         JSON.stringify({ fails, until: Date.now() + wait * 1000 }),
       );
-      return {
-        ok: false,
-        message: wait
-          ? `Wrong PIN. Locked for ${wait} s.`
-          : `Wrong PIN. ${MAX_FREE_TRIES - fails} ${MAX_FREE_TRIES - fails === 1 ? 'try' : 'tries'} left before a short lock.`,
-      };
+      return wait
+        ? { ok: false, key: 'm.auth.errWrongLocked', n: wait }
+        : { ok: false, key: 'm.auth.errWrong', n: MAX_FREE_TRIES - fails };
     },
     [accounts, saveSession],
   );

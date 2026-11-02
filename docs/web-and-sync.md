@@ -13,7 +13,8 @@ Phone side: `apps/mobile/src/sync.tsx`, mapping in `syncMap.ts`.
 Server side: `apps/server/src/routes/{auth,sync,media,dashboard}.ts`.
 The generic table envelope in `sync.ts` is unused and superseded.
 
-Not built: pulling data *down* to a new phone, and editing from the web.
+Not built: pulling data *down* to a new phone, and editing scores from the web.
+Students and their reviews are covered in [student-portal.md](student-portal.md).
 
 ## Run it (no Docker needed)
 

@@ -14,3 +14,6 @@ export * from './api.js';
 export * from './rubricGuide.js';
 export * from './account.js';
 export * from './dashboard.js';
+export * from './i18n/index.js';
+export * from './i18n/guides.js';
+export * from './student.js';

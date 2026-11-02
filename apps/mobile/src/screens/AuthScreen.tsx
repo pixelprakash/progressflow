@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Language } from '@progressflow/shared';
 import { MOBILE_RE, PIN_RE, useAuth, weakPin } from '../auth';
 import type { Teacher } from '../auth';
+import { useLang } from '../lang';
 import { theme } from '../theme';
 import { Btn, Chip, Icon } from '../components/ui';
 import { initials } from '../domain';
@@ -29,6 +30,7 @@ type Mode = 'pick' | 'pin' | 'register';
 /** Sign in (pick a teacher, enter PIN) or create a local teacher account. */
 export function AuthScreen() {
   const { accounts, login, register, removeAccount } = useAuth();
+  const { t, lang, setLang } = useLang();
   const insets = useSafeAreaInsets();
   const [mode, setMode] = useState<Mode>(accounts.length ? 'pick' : 'register');
   const [who, setWho] = useState<Teacher | null>(null);
@@ -60,7 +62,7 @@ export function AuthScreen() {
     const r = await login(who.id, pin);
     setBusy(false);
     if (!r.ok) {
-      setError(r.message);
+      setError(t(r.key, { n: r.n ?? 0 }));
       setPin('');
     }
   }
@@ -69,21 +71,21 @@ export function AuthScreen() {
     const m = mobile.replace(/\s/g, '');
     const problem =
       name.trim().length < 2
-        ? 'Enter your name.'
+        ? t('login.err.name')
         : school.trim().length < 2
-          ? 'Enter your school.'
+          ? t('login.err.school')
           : !MOBILE_RE.test(m)
-            ? 'Enter a 10-digit Indian mobile number.'
+            ? t('login.err.mobile')
             : accounts.some((a) => a.phone === `+91${m}`)
-              ? 'That number already has an account on this phone.'
+              ? t('m.auth.errDup')
               : !PIN_RE.test(pin1)
-                ? 'PIN must be 4 to 6 digits.'
+                ? t('m.auth.errPinFmt')
                 : weakPin(pin1)
-                  ? 'Choose a PIN that is not repeated or in sequence.'
+                  ? t('m.auth.errPinWeak')
                   : pin1 !== pin2
-                    ? 'The two PINs do not match.'
+                    ? t('m.auth.errPinMatch')
                     : !agree
-                      ? 'Please confirm the permission statement.'
+                      ? t('m.auth.errAgree')
                       : '';
     setError(problem);
     if (problem) return;
@@ -91,27 +93,23 @@ export function AuthScreen() {
     try {
       await register({ name, school, mobile: m, language, pin: pin1 });
     } catch {
-      setError('Could not create the account. Please try again.');
+      setError(t('m.auth.errFail'));
       setBusy(false);
     }
   }
 
   function forgot() {
     if (!who) return;
-    Alert.alert(
-      'Forgot your PIN?',
-      `A PIN cannot be recovered on this phone. You can erase ${who.name}'s account and all its scans and scores from this phone, then register again.\n\nThis cannot be undone.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Erase account',
-          style: 'destructive',
-          onPress: () => {
-            void removeAccount(who.id).then(() => go(accounts.length > 1 ? 'pick' : 'register'));
-          },
+    Alert.alert(t('m.auth.forgotTitle'), t('m.auth.forgotBody', { name: who.name }), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('m.auth.erase'),
+        style: 'destructive',
+        onPress: () => {
+          void removeAccount(who.id).then(() => go(accounts.length > 1 ? 'pick' : 'register'));
         },
-      ],
-    );
+      },
+    ]);
   }
 
   return (
@@ -131,12 +129,22 @@ export function AuthScreen() {
             <Icon name="palette-swatch-outline" size={34} color="#fff" />
           </View>
           <Text style={s.title}>ProgressFlow</Text>
-          <Text style={s.tag}>Formative assessment for art & design</Text>
+          <Text style={s.tag}>{t('m.auth.tagline')}</Text>
+          <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
+            {LANGS.map((l) => (
+              <Chip
+                key={l.code}
+                label={l.label}
+                selected={lang === l.code}
+                onPress={() => setLang(l.code)}
+              />
+            ))}
+          </View>
         </View>
 
         {mode === 'pick' && (
           <View style={s.form}>
-            <Text style={s.h}>Who is teaching?</Text>
+            <Text style={s.h}>{t('m.auth.who')}</Text>
             {accounts.map((a) => (
               <Pressable
                 key={a.id}
@@ -146,7 +154,7 @@ export function AuthScreen() {
                   go('pin');
                 }}
                 accessibilityRole="button"
-                accessibilityLabel={`Sign in as ${a.name}`}
+                accessibilityLabel={t('m.auth.signInAs', { name: a.name })}
               >
                 <View style={s.avatar}>
                   <Text style={s.avatarText}>{initials(a.name)}</Text>
@@ -159,7 +167,7 @@ export function AuthScreen() {
               </Pressable>
             ))}
             <Btn
-              label="Create a new account"
+              label={t('m.auth.createNew')}
               icon="account-plus-outline"
               kind="outline"
               onPress={() => go('register')}
@@ -178,7 +186,7 @@ export function AuthScreen() {
                 <Text style={s.meta}>{who.school}</Text>
               </View>
             </View>
-            <Text style={s.label}>PIN</Text>
+            <Text style={s.label}>{t('m.auth.pin')}</Text>
             <View style={s.pinRow}>
               <TextInput
                 style={[s.input, { flex: 1 }]}
@@ -191,53 +199,53 @@ export function AuthScreen() {
                 keyboardType="number-pad"
                 maxLength={6}
                 autoFocus
-                placeholder="4–6 digits"
+                placeholder={t('m.auth.pinPh')}
                 placeholderTextColor={theme.color.textMuted}
                 onSubmitEditing={() => void signIn()}
-                accessibilityLabel="PIN"
+                accessibilityLabel={t('m.auth.pin')}
               />
               <Pressable
                 onPress={() => setShowPin((v) => !v)}
                 style={s.eye}
-                accessibilityLabel={showPin ? 'Hide PIN' : 'Show PIN'}
+                accessibilityLabel={showPin ? t('m.auth.hidePin') : t('m.auth.showPin')}
               >
                 <Icon name={showPin ? 'eye-off-outline' : 'eye-outline'} />
               </Pressable>
             </View>
             {error ? <Text style={s.error}>{error}</Text> : null}
             <Btn
-              label="Sign in"
+              label={t('login.tab.signIn')}
               icon="login"
               onPress={() => void signIn()}
               disabled={busy || !PIN_RE.test(pin)}
             />
             <Pressable onPress={forgot} hitSlop={8}>
-              <Text style={s.link}>Forgot PIN?</Text>
+              <Text style={s.link}>{t('m.auth.forgot')}</Text>
             </Pressable>
             <Pressable onPress={() => go('pick')} hitSlop={8}>
-              <Text style={s.link}>Not you? Choose another teacher</Text>
+              <Text style={s.link}>{t('m.auth.notYou')}</Text>
             </Pressable>
           </View>
         )}
 
         {mode === 'register' && (
           <View style={s.form}>
-            <Text style={s.h}>Create your account</Text>
+            <Text style={s.h}>{t('m.auth.createTitle')}</Text>
             <Field
-              label="Your name"
+              label={t('login.name')}
               value={name}
               onChange={setName}
-              placeholder="e.g. Lakshmi Rao"
+              placeholder={t('m.auth.namePh')}
               cap="words"
             />
             <Field
-              label="School"
+              label={t('login.school')}
               value={school}
               onChange={setSchool}
-              placeholder="School name"
+              placeholder={t('m.auth.schoolPh')}
               cap="words"
             />
-            <Text style={s.label}>Mobile number</Text>
+            <Text style={s.label}>{t('login.mobile')}</Text>
             <View style={s.pinRow}>
               <View style={s.prefix}>
                 <Text style={s.prefixText}>+91</Text>
@@ -248,27 +256,28 @@ export function AuthScreen() {
                 onChangeText={(t) => setMobile(t.replace(/\D/g, '').slice(0, 10))}
                 keyboardType="number-pad"
                 maxLength={10}
-                placeholder="10-digit number"
+                placeholder={t('m.auth.mobilePh')}
                 placeholderTextColor={theme.color.textMuted}
-                accessibilityLabel="Mobile number"
+                accessibilityLabel={t('login.mobile')}
               />
             </View>
-            <Text style={s.label}>Voice-note language</Text>
+            <Text style={s.label}>{t('login.voiceLang')}</Text>
             <View style={{ flexDirection: 'row', gap: 8 }}>
               {LANGS.map((l) => (
                 <Chip
                   key={l.code}
                   label={l.label}
                   selected={language === l.code}
-                  onPress={() => setLanguage(l.code)}
+                  onPress={() => {
+                    setLanguage(l.code);
+                    setLang(l.code);
+                  }}
                 />
               ))}
             </View>
-            <Text style={s.hint}>
-              Used as the default for voice notes. The app screens are English for now.
-            </Text>
+            <Text style={s.hint}>{t('m.auth.langHint')}</Text>
             <Field
-              label="Create a PIN (4–6 digits)"
+              label={t('m.auth.createPin')}
               value={pin1}
               onChange={(t) => setPin1(t.replace(/\D/g, ''))}
               secure
@@ -276,7 +285,7 @@ export function AuthScreen() {
               numeric
             />
             <Field
-              label="Confirm PIN"
+              label={t('m.auth.confirmPin')}
               value={pin2}
               onChange={(t) => setPin2(t.replace(/\D/g, ''))}
               secure
@@ -294,24 +303,19 @@ export function AuthScreen() {
                 color={theme.color.primary}
                 size={26}
               />
-              <Text style={s.agreeText}>
-                My school has permitted me to photograph and record students' work in this app.
-              </Text>
+              <Text style={s.agreeText}>{t('m.auth.agree')}</Text>
             </Pressable>
-            <Text style={s.hint}>
-              Your account is stored on this phone and locks the app. It is not recoverable if you
-              forget the PIN.
-            </Text>
+            <Text style={s.hint}>{t('m.auth.note')}</Text>
             {error ? <Text style={s.error}>{error}</Text> : null}
             <Btn
-              label="Create account"
+              label={t('login.tab.create')}
               icon="check"
               onPress={() => void create()}
               disabled={busy}
             />
             {accounts.length > 0 && (
               <Pressable onPress={() => go('pick')} hitSlop={8}>
-                <Text style={s.link}>I already have an account</Text>
+                <Text style={s.link}>{t('m.auth.have')}</Text>
               </Pressable>
             )}
           </View>

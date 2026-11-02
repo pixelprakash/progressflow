@@ -1,12 +1,16 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import type { Language } from '@progressflow/shared';
+import { Link } from 'react-router-dom';
+import { LANGUAGE_NAMES } from '@progressflow/shared';
+import type { Language, TKey } from '@progressflow/shared';
 import { useAuth } from '../auth';
+import { LanguageSwitch, useLang } from '../i18n';
 
 const MOBILE_RE = /^[6-9]\d{9}$/;
 
 export function Login() {
   const { login, register } = useAuth();
+  const { t } = useLang();
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [name, setName] = useState('');
   const [school, setSchool] = useState('');
@@ -19,27 +23,28 @@ export function Login() {
 
   async function submit(e: FormEvent) {
     e.preventDefault();
-    const problem = !MOBILE_RE.test(mobile)
-      ? 'Enter a 10-digit Indian mobile number.'
-      : mode === 'register' && name.trim().length < 2
-        ? 'Enter your name.'
-        : mode === 'register' && school.trim().length < 2
-          ? 'Enter your school.'
-          : mode === 'register' && password.length < 8
-            ? 'Use a password of at least 8 characters.'
-            : mode === 'register' && password !== confirm
-              ? 'The two passwords do not match.'
-              : mode === 'login' && !password
-                ? 'Enter your password.'
+    const reg = mode === 'register';
+    const problem: TKey | '' = !MOBILE_RE.test(mobile)
+      ? 'login.err.mobile'
+      : reg && name.trim().length < 2
+        ? 'login.err.name'
+        : reg && school.trim().length < 2
+          ? 'login.err.school'
+          : reg && password.length < 8
+            ? 'login.err.pwShort'
+            : reg && password !== confirm
+              ? 'login.err.pwMatch'
+              : !reg && !password
+                ? 'login.err.pwEmpty'
                 : '';
-    setError(problem);
+    setError(problem ? t(problem) : '');
     if (problem) return;
     setBusy(true);
     try {
       if (mode === 'login') await login(mobile, password);
       else await register({ name: name.trim(), school: school.trim(), mobile, password, language });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong');
+      setError(err instanceof Error ? err.message : t('common.error'));
       setBusy(false);
     }
   }
@@ -47,12 +52,16 @@ export function Login() {
   return (
     <main className="auth">
       <form className="auth-card" onSubmit={(e) => void submit(e)} noValidate>
+        <div className="row between">
+          <span />
+          <LanguageSwitch />
+        </div>
         <div className="brand">
           <span className="logo" aria-hidden>
             ↗
           </span>
           <h1>ProgressFlow</h1>
-          <p className="muted">Teacher dashboard — formative assessment for art &amp; design</p>
+          <p className="muted">{t('login.tagline')}</p>
         </div>
 
         <div className="tabs" role="tablist">
@@ -65,7 +74,7 @@ export function Login() {
               setError('');
             }}
           >
-            Sign in
+            {t('login.tab.signIn')}
           </button>
           <button
             type="button"
@@ -76,18 +85,18 @@ export function Login() {
               setError('');
             }}
           >
-            Create account
+            {t('login.tab.create')}
           </button>
         </div>
 
         {mode === 'register' && (
           <>
             <label>
-              Your name
+              {t('login.name')}
               <input value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" />
             </label>
             <label>
-              School
+              {t('login.school')}
               <input
                 value={school}
                 onChange={(e) => setSchool(e.target.value)}
@@ -97,7 +106,7 @@ export function Login() {
           </>
         )}
         <label>
-          Mobile number
+          {t('login.mobile')}
           <span className="phone">
             <span className="prefix">+91</span>
             <input
@@ -110,7 +119,7 @@ export function Login() {
           </span>
         </label>
         <label>
-          Password
+          {t('login.password')}
           <input
             type="password"
             value={password}
@@ -121,7 +130,7 @@ export function Login() {
         {mode === 'register' && (
           <>
             <label>
-              Confirm password
+              {t('login.confirm')}
               <input
                 type="password"
                 value={confirm}
@@ -130,11 +139,13 @@ export function Login() {
               />
             </label>
             <label>
-              Voice-note language
+              {t('login.voiceLang')}
               <select value={language} onChange={(e) => setLanguage(e.target.value as Language)}>
-                <option value="en">English</option>
-                <option value="hi">हिन्दी</option>
-                <option value="te">తెలుగు</option>
+                {(Object.keys(LANGUAGE_NAMES) as Language[]).map((l) => (
+                  <option key={l} value={l}>
+                    {LANGUAGE_NAMES[l]}
+                  </option>
+                ))}
               </select>
             </label>
           </>
@@ -146,12 +157,15 @@ export function Login() {
           </p>
         )}
         <button className="primary" disabled={busy}>
-          {busy ? 'Please wait…' : mode === 'login' ? 'Sign in' : 'Create account'}
+          {busy
+            ? t('login.wait')
+            : mode === 'login'
+              ? t('login.tab.signIn')
+              : t('login.tab.create')}
         </button>
-        <p className="muted small">
-          {mode === 'login'
-            ? 'Use the same mobile number and password you set up for the ProgressFlow app, then sync from your phone to see your classes here.'
-            : 'This web account is also what the phone app signs in with to sync your classes.'}
+        <p className="muted small">{mode === 'login' ? t('login.helpIn') : t('login.helpReg')}</p>
+        <p className="small">
+          <Link to="/student">{t('login.studentLink')}</Link>
         </p>
       </form>
     </main>

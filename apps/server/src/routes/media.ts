@@ -3,7 +3,7 @@ import express from 'express';
 import { MEDIA_KINDS } from '@progressflow/shared';
 import type { MediaKind } from '@progressflow/shared';
 import { prisma } from '../db.js';
-import { fail, requireTeacher } from '../auth/middleware.js';
+import { fail, requireActor, requireTeacher } from '../auth/middleware.js';
 import { describe, read, save } from '../services/media.js';
 
 export const mediaRouter = Router();
@@ -28,6 +28,55 @@ async function keyFor(teacherId: string, kind: MediaKind, id: string): Promise<s
   }
   const a = await prisma.feedbackAttachment.findFirst({
     where: { id, deletedAt: null, assessment: owned },
+  });
+  return a?.storageKey ?? null;
+}
+
+/**
+ * Storage key for media a student may see: their own teacher-assessed pieces, plus the
+ * images (only) of a classmate's piece the teacher has opened for peer review.
+ */
+async function keyForStudent(
+  studentId: string,
+  kind: MediaKind,
+  id: string,
+): Promise<string | null> {
+  const mine = { assessorType: 'teacher' as const, deletedAt: null, studentId };
+  if (kind === 'page') {
+    const klassIds = (
+      await prisma.enrollment.findMany({
+        where: { studentId, deletedAt: null },
+        select: { klassId: true },
+      })
+    ).map((e) => e.klassId);
+    const p = await prisma.artworkPhoto.findFirst({
+      where: {
+        id,
+        deletedAt: null,
+        assessment: {
+          OR: [
+            mine,
+            {
+              assessorType: 'teacher',
+              deletedAt: null,
+              peerOpen: true,
+              studentId: { not: studentId },
+              assignment: { klassId: { in: klassIds } },
+            },
+          ],
+        },
+      },
+    });
+    return p?.storageKey ?? null;
+  }
+  if (kind === 'voice') {
+    const v = await prisma.voiceNote.findFirst({
+      where: { assessmentId: id, deletedAt: null, assessment: mine },
+    });
+    return v?.storageKey ?? null;
+  }
+  const a = await prisma.feedbackAttachment.findFirst({
+    where: { id, deletedAt: null, assessment: mine },
   });
   return a?.storageKey ?? null;
 }
@@ -62,10 +111,12 @@ mediaRouter.put(
   },
 );
 
-mediaRouter.get('/media/:kind/:id', requireTeacher, async (req, res) => {
+mediaRouter.get('/media/:kind/:id', requireActor, async (req, res) => {
   const { kind, id } = req.params as { kind: string; id: string };
   if (!parse(kind, id)) return fail(res, 400, 'invalid', 'bad media request');
-  const key = await keyFor(req.teacherId!, kind, id);
+  const key = req.studentId
+    ? await keyForStudent(req.studentId, kind, id)
+    : await keyFor(req.teacherId!, kind, id);
   if (!key) return fail(res, 404, 'not_found', 'no such media');
   try {
     const { type, inline } = describe(key);

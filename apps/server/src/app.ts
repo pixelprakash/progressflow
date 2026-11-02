@@ -12,6 +12,7 @@ import { authRouter } from './routes/auth.js';
 import { dashboardRouter } from './routes/dashboard.js';
 import { healthRouter } from './routes/health.js';
 import { mediaRouter } from './routes/media.js';
+import { studentRouter } from './routes/student.js';
 import { syncRouter } from './routes/sync.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -43,6 +44,7 @@ export function createApp() {
   app.use('/v1', authRouter);
   app.use('/v1', syncRouter);
   app.use('/v1', mediaRouter);
+  app.use('/v1', studentRouter);
   app.use('/v1', dashboardRouter);
 
   app.use('/v1', (_req, res) => {

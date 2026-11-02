@@ -13,7 +13,8 @@ MVP (Aug–Dec 2026). Scope and phases: [ROADMAP.md](ROADMAP.md).
   specifiers required (NodeNext).
 - `apps/mobile` — Expo (SDK 52, new architecture). Plain `App.tsx` entry, no
   expo-router yet.
-- `apps/web` — teacher dashboard (Vite + React), read-only, served by the API in prod.
+- `apps/web` — teacher dashboard and student portal (Vite + React), served by the API in prod.
+  All text goes through `packages/shared/src/i18n` (en/hi/te): no hardcoded strings.
 - `apps/site` — public project page (static). Plain CSS, no Tailwind; keep it WCAG 2.2 AA.
 - `infra/docker-compose.yml` — Postgres + MinIO for local dev.
 

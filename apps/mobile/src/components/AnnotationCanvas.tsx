@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { Image, PanResponder, View } from 'react-native';
 import type { LayoutChangeEvent } from 'react-native';
+import { useLang } from '../lang';
 import Svg, { Ellipse, Line, Polygon, Polyline } from 'react-native-svg';
 import type { AnnotationStroke, AnnotationTool } from '@progressflow/shared';
 
@@ -42,6 +43,7 @@ export function AnnotationCanvas({
   color: string;
   onAdd: (s: AnnotationStroke) => void;
 }) {
+  const { t } = useLang();
   const [box, setBox] = useState({ w: 0, h: 0 });
   const [draft, setDraft] = useState<Pt[] | null>(null);
   const live = useRef({ drawing, tool, color, onAdd, rw: 1, rh: 1 });
@@ -104,7 +106,7 @@ export function AnnotationCanvas({
         source={{ uri }}
         style={{ width: '100%', height: '100%' }}
         resizeMode="contain"
-        accessibilityLabel="Student artwork"
+        accessibilityLabel={t('m.cap.artwork')}
       />
       {scale > 0 ? (
         <View

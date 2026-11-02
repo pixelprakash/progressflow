@@ -9,8 +9,8 @@ import {
   View,
 } from 'react-native';
 import type { AssessmentKind } from '@progressflow/shared';
-import { KIND_META, compositeScore, shortDate } from '../domain';
-import { GUIDES } from '../rubricContent';
+import { KIND_META, compositeScore } from '../domain';
+import { useLang } from '../lang';
 import { useStore } from '../store';
 import { theme } from '../theme';
 import { Chip, Header, Icon } from '../components/ui';
@@ -27,6 +27,7 @@ export function StudentScreen({
   onOpen: (id: string) => void;
 }) {
   const { data } = useStore();
+  const { t, guides, shortDate } = useLang();
   const { width } = useWindowDimensions();
   const [filter, setFilter] = useState<AssessmentKind | 'all'>('all');
   const student = data.students.find((x) => x.id === studentId);
@@ -38,7 +39,7 @@ export function StudentScreen({
   const shown = all.filter((x) => filter === 'all' || x.kind === filter);
   const scoredSubs = shown.filter((x) => compositeScore(x.scores) !== null);
 
-  const series = GUIDES.map((g) => ({
+  const series = guides.map((g) => ({
     key: g.key,
     color: g.color,
     points: scoredSubs.flatMap((x) => {
@@ -53,7 +54,7 @@ export function StudentScreen({
     <View style={s.root}>
       <Header
         title={student.name}
-        subtitle={`Roll ${student.rollNo} · ${all.length} submissions`}
+        subtitle={`${t('common.roll', { n: student.rollNo })} · ${t('m.class.subs', { n: all.length })}`}
         onBack={onBack}
       />
       <ScrollView contentContainerStyle={s.content}>
@@ -62,11 +63,15 @@ export function StudentScreen({
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ gap: 8 }}
         >
-          <Chip label="All" selected={filter === 'all'} onPress={() => setFilter('all')} />
+          <Chip
+            label={t('common.all')}
+            selected={filter === 'all'}
+            onPress={() => setFilter('all')}
+          />
           {(Object.keys(KIND_META) as AssessmentKind[]).map((k) => (
             <Chip
               key={k}
-              label={KIND_META[k].label}
+              label={t(`kind.${k}`)}
               icon={KIND_META[k].icon}
               selected={filter === k}
               onPress={() => setFilter(k)}
@@ -75,9 +80,9 @@ export function StudentScreen({
         </ScrollView>
 
         <View style={s.card}>
-          <Text style={s.title}>Progress over time</Text>
+          <Text style={s.title}>{t('stu.history')}</Text>
           {scoredSubs.length === 0 ? (
-            <Text style={s.meta}>No scored work yet for this filter.</Text>
+            <Text style={s.meta}>{t('m.stu.noScored')}</Text>
           ) : (
             <>
               {first !== null && last !== null && scoredSubs.length > 1 && (
@@ -88,7 +93,7 @@ export function StudentScreen({
               )}
               <GrowthChart series={series} width={width - theme.space.md * 4} />
               <View style={s.legend}>
-                {GUIDES.map((g) => (
+                {guides.map((g) => (
                   <View key={g.key} style={s.legendItem}>
                     <Icon name={g.icon} size={18} color={g.color} />
                     <Text style={s.meta}>{g.name}</Text>
@@ -99,7 +104,7 @@ export function StudentScreen({
           )}
         </View>
 
-        <Text style={s.title}>Portfolio</Text>
+        <Text style={s.title}>{t('stu.portfolio')}</Text>
         <View style={s.grid}>
           {[...shown].reverse().map((sub) => {
             const avg = compositeScore(sub.scores);
@@ -119,10 +124,10 @@ export function StudentScreen({
                   </View>
                 )}
                 <View style={{ padding: 8, gap: 2 }}>
-                  <Text style={s.tileTitle}>{KIND_META[sub.kind].label}</Text>
+                  <Text style={s.tileTitle}>{t(`kind.${sub.kind}`)}</Text>
                   <Text style={s.meta}>
                     {shortDate(sub.createdAt)}
-                    {avg !== null ? ` · ${avg.toFixed(1)}` : ' · not scored'}
+                    {avg !== null ? ` · ${avg.toFixed(1)}` : ` · ${t('common.notScored')}`}
                   </Text>
                 </View>
               </Pressable>

@@ -3,6 +3,7 @@ import { ActivityIndicator, BackHandler, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from './src/auth';
+import { LangProvider, useLang } from './src/lang';
 import { StoreProvider, useStore } from './src/store';
 import { SyncProvider } from './src/sync';
 import { scanPages, pickFromGallery } from './src/capture/scan';
@@ -103,6 +104,11 @@ function Root() {
 
 function AuthGate() {
   const { loading, current } = useAuth();
+  const { chosen, suggest } = useLang();
+  // Until the teacher picks a language, follow the one on their profile.
+  useEffect(() => {
+    if (current && !chosen) suggest(current.language);
+  }, [current, chosen, suggest]);
   if (loading) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
@@ -125,9 +131,11 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <StatusBar style="dark" />
-      <AuthProvider>
-        <AuthGate />
-      </AuthProvider>
+      <LangProvider>
+        <AuthProvider>
+          <AuthGate />
+        </AuthProvider>
+      </LangProvider>
     </SafeAreaProvider>
   );
 }

@@ -198,23 +198,22 @@ export function SyncProvider({ children }: { children: ReactNode }) {
         }
         f = { synced, meta: bi === 0 ? meta : f.meta, lastSyncAt: new Date().toISOString() };
         await saveFile(f);
-        if (failed.size > 0)
-          throw new Error('Some photos or recordings could not be uploaded yet.');
+        if (failed.size > 0) throw new Error('m.web.msgMedia');
       }
       setStatus('idle');
     } catch (e) {
       if (e instanceof HttpError && e.status === 401) {
         setStatus('signin');
-        setMessage('Your web sign-in expired. Sign in again.');
+        setMessage('m.web.msgExpired');
       } else if (e instanceof HttpError) {
         setStatus('error');
         setMessage(e.message);
-      } else if (e instanceof Error && e.message.startsWith('Some photos')) {
+      } else if (e instanceof Error && e.message === 'm.web.msgMedia') {
         setStatus('error');
         setMessage(e.message);
       } else {
         setStatus('offline');
-        setMessage('No connection to the server. It will retry.');
+        setMessage('m.web.msgOffline');
       }
     } finally {
       running.current = false;
@@ -238,13 +237,12 @@ export function SyncProvider({ children }: { children: ReactNode }) {
 
   const link = useCallback(
     async (input: LinkInput): Promise<string | null> => {
-      if (!teacher) return 'Sign in to the app first.';
+      if (!teacher) return 'm.web.errApp';
       const p = parseHttpUrl(input.serverUrl, true);
-      if (!p) return 'Enter a valid server address.';
-      if (p.scheme === 'http' && !isPrivateHost(p.host))
-        return 'Use an https:// address for a server on the internet.';
-      if (!MOBILE_RE.test(input.mobile)) return 'Enter a 10-digit mobile number.';
-      if (input.password.length < 8) return 'The password must be at least 8 characters.';
+      if (!p) return 'm.web.errUrl';
+      if (p.scheme === 'http' && !isPrivateHost(p.host)) return 'm.web.errHttps';
+      if (!MOBILE_RE.test(input.mobile)) return 'login.err.mobile';
+      if (input.password.length < 8) return 'login.err.pwShort';
       try {
         const phone = `+91${input.mobile}`;
         if (input.mode === 'register') {
@@ -269,7 +267,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
         return null;
       } catch (e) {
         if (e instanceof HttpError) return e.message;
-        return 'Cannot reach the server. Check the address and your connection.';
+        return 'm.web.errUnreach';
       }
     },
     [teacher],

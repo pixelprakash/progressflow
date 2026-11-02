@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useLang } from '../lang';
 import { theme } from '../theme';
 
 type IconName = React.ComponentProps<typeof MaterialCommunityIcons>['name'];
@@ -138,13 +139,14 @@ export function Sheet({
   children: ReactNode;
 }) {
   const insets = useSafeAreaInsets();
+  const { t } = useLang();
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={s.scrim} onPress={onClose} accessibilityLabel="Close" />
+      <Pressable style={s.scrim} onPress={onClose} accessibilityLabel={t('m.close')} />
       <View style={[s.sheet, { paddingBottom: insets.bottom + theme.space.md }]}>
         <View style={s.sheetHead}>
           <Text style={s.sheetTitle}>{title}</Text>
-          <Pressable onPress={onClose} hitSlop={12} accessibilityLabel="Close">
+          <Pressable onPress={onClose} hitSlop={12} accessibilityLabel={t('m.close')}>
             <Icon name="close" size={26} />
           </Pressable>
         </View>
@@ -168,10 +170,16 @@ export function Header({
   right?: ReactNode;
 }) {
   const insets = useSafeAreaInsets();
+  const { t } = useLang();
   return (
     <View style={[s.header, { paddingTop: insets.top + theme.space.sm }]}>
       {onBack ? (
-        <Pressable onPress={onBack} hitSlop={10} accessibilityLabel="Back" style={s.back}>
+        <Pressable
+          onPress={onBack}
+          hitSlop={10}
+          accessibilityLabel={t('common.back')}
+          style={s.back}
+        >
           <Icon name="arrow-left" size={26} />
         </Pressable>
       ) : null}

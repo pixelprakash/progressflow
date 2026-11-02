@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { AnnotationStroke } from '@progressflow/shared';
+import { useLang } from '../i18n';
 
 /** Artwork with the teacher's markup on top. The switch hides the markup without losing it. */
 export function AnnotatedImage({
@@ -7,25 +8,24 @@ export function AnnotatedImage({
   width,
   height,
   strokes,
+  alt,
 }: {
   src: string;
   width: number;
   height: number;
   strokes: AnnotationStroke[];
+  alt: string;
 }) {
+  const { t } = useLang();
   const [show, setShow] = useState(true);
   const head = Math.min(width, height) * 0.035;
 
   return (
     <div className="annotated">
       <div className="frame" style={{ aspectRatio: `${width} / ${height}` }}>
-        <img src={src} alt="Student artwork" />
+        <img src={src} alt={alt} />
         {show && strokes.length > 0 && (
-          <svg
-            viewBox={`0 0 ${width} ${height}`}
-            preserveAspectRatio="none"
-            aria-label="Teacher markup"
-          >
+          <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" aria-hidden>
             {strokes.map((s, i) => (
               <Mark key={i} s={s} w={width} h={height} head={head} />
             ))}
@@ -35,13 +35,11 @@ export function AnnotatedImage({
       {strokes.length > 0 ? (
         <label className="switch">
           <input type="checkbox" checked={show} onChange={(e) => setShow(e.target.checked)} />
-          <span>{show ? 'Markup shown' : 'Markup hidden'}</span>
-          <small>
-            {strokes.length} {strokes.length === 1 ? 'mark' : 'marks'}
-          </small>
+          <span>{show ? t('sub.markShown') : t('sub.markHidden')}</span>
+          <small>{t('sub.marks', { n: strokes.length })}</small>
         </label>
       ) : (
-        <p className="muted small">No markup on this image.</p>
+        <p className="muted small">{t('sub.noMarks')}</p>
       )}
     </div>
   );

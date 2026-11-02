@@ -13,6 +13,8 @@ import type { AssessmentKind } from '@progressflow/shared';
 import type { Page, Submission } from '../domain';
 import { KIND_META } from '../domain';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import type { TKey } from '@progressflow/shared';
+import { useLang } from '../lang';
 import { useStore, newId, persistMedia } from '../store';
 import { theme } from '../theme';
 import { Btn, Chip, Header, Icon, IconBtn, Sheet } from '../components/ui';
@@ -60,6 +62,7 @@ export function ReviewScreen({
   onSaved: (ids: string[]) => void;
 }) {
   const { data, addSubmissions } = useStore();
+  const { t } = useLang();
   const { height: winH } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [tiles, setTiles] = useState<Tile[]>([]);
@@ -197,17 +200,17 @@ export function ReviewScreen({
     const unassigned = tiles.find((t) => !t.studentId);
     if (unassigned) {
       setSel(unassigned.key);
-      Alert.alert('Choose a student', 'Every scan needs a student before it can be saved.');
+      Alert.alert(t('m.rev.chooseStudent'), t('m.rev.chooseBody'));
       return;
     }
     const bad = tiles.filter(hasProblem);
     if (bad.length) {
       Alert.alert(
-        `${bad.length} ${bad.length === 1 ? 'scan has' : 'scans have'} problems`,
-        'Retaking gives a fairer assessment. You can also save them as they are.',
+        bad.length === 1 ? t('m.rev.problem1') : t('m.rev.problemN', { n: bad.length }),
+        t('m.rev.problemBody'),
         [
-          { text: 'Review', onPress: () => setSel(bad[0]?.key ?? null) },
-          { text: 'Save anyway', onPress: () => void doSave() },
+          { text: t('m.rev.look'), onPress: () => setSel(bad[0]?.key ?? null) },
+          { text: t('m.rev.saveAnyway'), onPress: () => void doSave() },
         ],
       );
       return;
@@ -217,28 +220,28 @@ export function ReviewScreen({
 
   function cancel() {
     if (!tiles.length) return onCancel();
-    Alert.alert('Discard these scans?', 'Nothing has been saved yet.', [
-      { text: 'Keep editing', style: 'cancel' },
-      { text: 'Discard', style: 'destructive', onPress: onCancel },
+    Alert.alert(t('m.rev.discardTitle'), t('m.rev.discardBody'), [
+      { text: t('m.rev.keepEditing'), style: 'cancel' },
+      { text: t('m.rev.discard'), style: 'destructive', onPress: onCancel },
     ]);
   }
 
   const matched = current ? studentOf(current.studentId) : undefined;
   const viaText = current?.detection?.via
     ? {
-        roll: 'Matched by roll number',
-        name: 'Matched by name — please check',
-        both: 'Matched by roll number and name',
+        roll: t('m.rev.viaRoll'),
+        name: t('m.rev.viaName'),
+        both: t('m.rev.viaBoth'),
       }[current.detection.via]
-    : "Couldn't read a roll number or name — choose the student";
+    : t('m.rev.viaNone');
   const unsure = !!current && !!current.detection && current.detection.confidence < 0.8;
 
   return (
     <View style={s.root}>
-      <Header title={`Review scans (${tiles.length})`} onBack={cancel} />
+      <Header title={t('m.rev.title', { n: tiles.length })} onBack={cancel} />
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: theme.space.md }}>
         <View style={s.kindRow}>
-          <Text style={s.label}>This batch is a…</Text>
+          <Text style={s.label}>{t('m.rev.batch')}</Text>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -247,7 +250,7 @@ export function ReviewScreen({
             {(Object.keys(KIND_META) as AssessmentKind[]).map((k) => (
               <Chip
                 key={k}
-                label={KIND_META[k].label}
+                label={t(`kind.${k}`)}
                 icon={KIND_META[k].icon}
                 selected={kind === k}
                 onPress={() => setKind(k)}
@@ -263,11 +266,11 @@ export function ReviewScreen({
                 source={{ uri: current.uri }}
                 style={{ flex: 1 }}
                 resizeMode="contain"
-                accessibilityLabel="Scanned page"
+                accessibilityLabel={t('m.rev.scanned')}
               />
               {current.busy && (
                 <View style={s.busy}>
-                  <Text style={s.busyText}>Checking quality and reading name…</Text>
+                  <Text style={s.busyText}>{t('m.rev.checking')}</Text>
                 </View>
               )}
             </View>
@@ -276,7 +279,7 @@ export function ReviewScreen({
               style={s.student}
               onPress={() => setPicking(true)}
               accessibilityRole="button"
-              accessibilityLabel="Change student"
+              accessibilityLabel={t('m.rev.changeStudent')}
             >
               <Icon
                 name={matched ? 'account-check-outline' : 'account-question-outline'}
@@ -285,37 +288,39 @@ export function ReviewScreen({
               />
               <View style={{ flex: 1 }}>
                 <Text style={s.studentName}>
-                  {matched ? `${matched.name} · Roll ${matched.rollNo}` : 'Choose student'}
+                  {matched
+                    ? `${matched.name} · ${t('common.roll', { n: matched.rollNo })}`
+                    : t('m.rev.chooseStudent')}
                 </Text>
-                <Text style={s.meta}>{current.busy ? 'Reading…' : viaText}</Text>
+                <Text style={s.meta}>{current.busy ? t('m.rev.reading') : viaText}</Text>
               </View>
-              <Text style={s.change}>Change</Text>
+              <Text style={s.change}>{t('m.rev.change')}</Text>
             </Pressable>
 
             <View style={s.toolbar}>
               <IconBtn
                 icon="camera-retake-outline"
-                label="Retake"
+                label={t('m.rev.retake')}
                 onPress={() => void retake(current)}
                 disabled={current.busy}
                 active={hasProblem(current)}
               />
               <IconBtn
                 icon="rotate-right"
-                label="Rotate"
+                label={t('m.rev.rotate')}
                 onPress={() => void rotate(current)}
                 disabled={current.busy}
               />
               {hasProblem(current) && (
                 <IconBtn
                   icon="check"
-                  label="Use anyway"
+                  label={t('m.rev.useAnyway')}
                   onPress={() => patch(current.key, { accepted: true })}
                 />
               )}
               <IconBtn
                 icon="trash-can-outline"
-                label="Delete"
+                label={t('m.rev.delete')}
                 onPress={() => remove(current)}
                 color={theme.color.danger}
               />
@@ -331,30 +336,34 @@ export function ReviewScreen({
                 <View style={{ flex: 1, gap: 6 }}>
                   <Text style={s.bannerTitle}>
                     {hasProblem(current)
-                      ? 'Please retake this one'
+                      ? t('m.rev.retakeThis')
                       : current.accepted
-                        ? 'Accepted as is'
-                        : 'Good scan'}
+                        ? t('m.rev.accepted')
+                        : t('m.rev.good')}
                   </Text>
                   {current.quality.issues.map((i) => (
                     <View key={i} style={{ flexDirection: 'row', gap: 8 }}>
                       <Icon name={ISSUE_TEXT[i].icon} size={20} color={theme.color.warning} />
                       <Text style={s.issue}>
-                        <Text style={{ fontWeight: '700' }}>{ISSUE_TEXT[i].title}. </Text>
-                        {ISSUE_TEXT[i].fix}
+                        <Text style={{ fontWeight: '700' }}>{t(`m.issue.${i}` as TKey)}. </Text>
+                        {t(`m.fix.${i}` as TKey)}
                       </Text>
                     </View>
                   ))}
                   <Text style={s.tech}>
-                    {current.width}×{current.height}px · sharpness {current.quality.sharpness} ·
-                    brightness {current.quality.brightness}
+                    {t('m.rev.tech', {
+                      w: current.width,
+                      h: current.height,
+                      sharp: current.quality.sharpness,
+                      light: current.quality.brightness,
+                    })}
                   </Text>
                 </View>
               </View>
             )}
           </>
         ) : (
-          <Text style={[s.meta, { padding: theme.space.lg }]}>No scans yet.</Text>
+          <Text style={[s.meta, { padding: theme.space.lg }]}>{t('m.rev.noScans')}</Text>
         )}
       </ScrollView>
 
@@ -364,23 +373,23 @@ export function ReviewScreen({
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ gap: 8, paddingHorizontal: theme.space.md }}
         >
-          {tiles.map((t, i) => (
+          {tiles.map((tile, i) => (
             <Pressable
-              key={t.key}
-              onPress={() => setSel(t.key)}
-              style={[s.thumb, t.key === current?.key && s.thumbSel]}
-              accessibilityLabel={`Page ${i + 1}`}
+              key={tile.key}
+              onPress={() => setSel(tile.key)}
+              style={[s.thumb, tile.key === current?.key && s.thumbSel]}
+              accessibilityLabel={t('m.rev.page', { n: i + 1 })}
             >
-              <Image source={{ uri: t.uri }} style={{ flex: 1 }} resizeMode="cover" />
+              <Image source={{ uri: tile.uri }} style={{ flex: 1 }} resizeMode="cover" />
               <View style={s.num}>
                 <Text style={s.numText}>{i + 1}</Text>
               </View>
-              {hasProblem(t) && (
+              {hasProblem(tile) && (
                 <View style={s.warnDot}>
                   <Icon name="alert" size={14} color="#fff" />
                 </View>
               )}
-              {!t.studentId && !t.busy && (
+              {!tile.studentId && !tile.busy && (
                 <View style={[s.warnDot, { backgroundColor: theme.color.danger }]}>
                   <Icon name="account-question" size={14} color="#fff" />
                 </View>
@@ -391,9 +400,14 @@ export function ReviewScreen({
       </View>
 
       <View style={[s.bottom, { paddingBottom: theme.space.md + insets.bottom }]}>
-        <Btn label="Keep scanning" kind="outline" onPress={() => void keepScanning()} flex />
         <Btn
-          label={`Save ${tiles.length}`}
+          label={t('m.rev.keepScanning')}
+          kind="outline"
+          onPress={() => void keepScanning()}
+          flex
+        />
+        <Btn
+          label={t('m.rev.save', { n: tiles.length })}
           icon="content-save-outline"
           onPress={save}
           disabled={busy || !tiles.length}
@@ -401,7 +415,7 @@ export function ReviewScreen({
         />
       </View>
 
-      <Sheet visible={picking} onClose={() => setPicking(false)} title="Whose artwork is this?">
+      <Sheet visible={picking} onClose={() => setPicking(false)} title={t('m.rev.whose')}>
         {students.map((st) => (
           <Pressable
             key={st.id}
@@ -419,9 +433,7 @@ export function ReviewScreen({
             <Text style={s.meta}>Roll {st.rollNo}</Text>
           </Pressable>
         ))}
-        <Text style={s.meta}>
-          Two pages for the same student are saved together as one submission with multiple images.
-        </Text>
+        <Text style={s.meta}>{t('m.rev.merge')}</Text>
       </Sheet>
     </View>
   );

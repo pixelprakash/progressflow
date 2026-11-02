@@ -12,7 +12,7 @@ export const authRouter = Router();
 
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: 20,
+  limit: 20 * config.RATE_LIMIT_MULTIPLIER,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: { code: 'rate_limited', message: 'too many attempts, try again later' } },

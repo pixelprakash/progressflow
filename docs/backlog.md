@@ -38,9 +38,9 @@ feature (F1–F5) or component (C1–C4). Copy these into issues.
 - [ ] **F2** voice record (hi/te/en) + queued upload  · C2
 - [ ] **F2** server: audio → Google Speech async → transcript + status  · C2
 - [ ] **F2** transcript display + teacher correction; audio always retained  · C2
-- [ ] **F3** student sign-in via join code  · C3
-- [ ] **F3** guided multi-step review form on the teacher's rubric  · C3
-- [ ] **F3** responses recorded + visible to teacher  · C3
+- [x] **F3** student sign-in via join code (web portal)  · C3
+- [x] **F3** guided self- and peer-review forms on the teacher's rubric  · C3
+- [x] **F3** responses recorded + visible to teacher; peer feedback approved by teacher  · C3
 - [ ] 31 Oct: end-to-end demo (photo → annotate → Telugu voice note → self-assessment)
 
 ## Phase 3 — F4 + F5 (3 Nov → 21 Nov)
@@ -48,7 +48,7 @@ feature (F1–F5) or component (C1–C4). Copy these into issues.
 - [ ] `ProgressSnapshot` computation on assessment write  · C4
 - [ ] **F4** teacher dashboard: per-student history + growth curves + class view  · C4
 - [ ] **F4** "export for parents" PDF/summary per student  · C4
-- [ ] **F5** student portal: artwork timeline + feedback + personal curve  · C4
+- [x] **F5** student portal: artwork timeline + feedback + personal curve (web)  · C4
 - [ ] Notifications: "new feedback from your teacher"
 
 ## Phase 4 — Testing & hardening (24 Nov → 12 Dec)
@@ -57,7 +57,7 @@ feature (F1–F5) or component (C1–C4). Copy these into issues.
 - [ ] Instrument assessment-time-per-student (target: halved)
 - [ ] Teacher satisfaction survey (target: 4/5)
 - [ ] Low-end Android performance pass
-- [ ] Trilingual UI + accessibility review
+- [~] Trilingual UI built (en/hi/te: web, student portal, phone app); needs native-speaker review + accessibility review
 - [ ] Security review: encryption, signed URLs, auth, consent enforcement
 
 ## Phase 5 — Ship & document (15 Dec → end of month)

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { KIND_META, classLabel, compositeScore, initials, shortDate } from '../domain';
-import { GUIDES } from '../rubricContent';
+import { KIND_META, classLabel, compositeScore, initials } from '../domain';
+import { useLang } from '../lang';
 import { newId, useStore } from '../store';
 import { theme } from '../theme';
 import { Btn, Header, Icon, Sheet } from '../components/ui';
@@ -22,6 +22,7 @@ export function ClassScreen({
   onOpenStudent: (id: string) => void;
 }) {
   const { data, addStudent } = useStore();
+  const { t, guides, shortDate } = useLang();
   const klass = data.classes.find((c) => c.id === classId);
   const roster = data.students.filter((st) => st.classId === classId);
   const [adding, setAdding] = useState(false);
@@ -31,13 +32,13 @@ export function ClassScreen({
   const rosterIds = new Set(roster.map((st) => st.id));
   const toScore = data.submissions
     .filter((s) => rosterIds.has(s.studentId))
-    .filter((s) => s.pages.length > 0 && Object.keys(s.scores).length < GUIDES.length)
+    .filter((s) => s.pages.length > 0 && Object.keys(s.scores).length < guides.length)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
   return (
     <View style={s.root}>
       <Header
-        title={klass ? `Class ${classLabel(klass)}` : 'Class'}
+        title={klass ? t('common.class', { label: classLabel(klass) }) : ''}
         subtitle={klass?.assignment}
         onBack={onBack}
       />
@@ -45,15 +46,13 @@ export function ClassScreen({
         {data.sample ? (
           <View style={s.demo}>
             <Icon name="information-outline" size={18} color={theme.color.warning} />
-            <Text style={s.demoText}>
-              Sample class with made-up students. Past scores exist for Class 7-B only.
-            </Text>
+            <Text style={s.demoText}>{t('m.class.sampleBanner')}</Text>
           </View>
         ) : null}
 
-        <Btn label="Scan artwork" icon="scanner" onPress={onScan} />
+        <Btn label={t('m.class.scan')} icon="scanner" onPress={onScan} />
         <Btn
-          label="Import from gallery"
+          label={t('m.class.gallery')}
           icon="image-multiple-outline"
           kind="outline"
           onPress={onGallery}
@@ -61,7 +60,7 @@ export function ClassScreen({
 
         {toScore.length > 0 && (
           <View style={s.card}>
-            <Text style={s.cardTitle}>Waiting for your evaluation</Text>
+            <Text style={s.cardTitle}>{t('m.class.waiting')}</Text>
             {toScore.map((sub) => (
               <Pressable
                 key={sub.id}
@@ -75,8 +74,8 @@ export function ClassScreen({
                 <View style={{ flex: 1 }}>
                   <Text style={s.name}>{nameOf(sub.studentId)}</Text>
                   <Text style={s.meta}>
-                    {KIND_META[sub.kind].label} · {sub.pages.length}{' '}
-                    {sub.pages.length === 1 ? 'image' : 'images'} · {shortDate(sub.createdAt)}
+                    {t(`kind.${sub.kind}`)} · {t('sub.images', { n: sub.pages.length })} ·{' '}
+                    {shortDate(sub.createdAt)}
                   </Text>
                 </View>
                 <Icon name="chevron-right" color={theme.color.textMuted} />
@@ -86,7 +85,7 @@ export function ClassScreen({
         )}
 
         <View style={s.card}>
-          <Text style={s.cardTitle}>Students</Text>
+          <Text style={s.cardTitle}>{t('cls.students')}</Text>
           {roster.map((st) => {
             const subs = data.submissions
               .filter((x) => x.studentId === st.id)
@@ -108,8 +107,10 @@ export function ClassScreen({
                   <Text style={s.meta}>
                     Roll {st.rollNo} ·{' '}
                     {subs.length === 0
-                      ? 'No work yet'
-                      : `${subs.length} ${subs.length === 1 ? 'submission' : 'submissions'}`}
+                      ? t('m.class.noWork')
+                      : subs.length === 1
+                        ? t('m.class.sub1', { n: 1 })
+                        : t('m.class.subs', { n: subs.length })}
                   </Text>
                 </View>
                 {avg !== null && <Text style={s.avg}>{avg.toFixed(1)}</Text>}
@@ -118,7 +119,7 @@ export function ClassScreen({
             );
           })}
           <Btn
-            label="Add student"
+            label={t('m.class.addStudent')}
             icon="account-plus-outline"
             kind="ghost"
             onPress={() => {
@@ -132,33 +133,30 @@ export function ClassScreen({
         </View>
       </ScrollView>
 
-      <Sheet visible={adding} onClose={() => setAdding(false)} title="Add a student">
+      <Sheet visible={adding} onClose={() => setAdding(false)} title={t('m.class.addStudentTitle')}>
         <TextInput
           style={s.input}
           value={newName}
           onChangeText={setNewName}
-          placeholder="Name, e.g. Aarav K."
+          placeholder={t('m.class.namePh')}
           placeholderTextColor={theme.color.textMuted}
         />
         <TextInput
           style={s.input}
           value={newRoll}
           onChangeText={setNewRoll}
-          placeholder="Roll number"
+          placeholder={t('m.class.rollPh')}
           placeholderTextColor={theme.color.textMuted}
           keyboardType="number-pad"
         />
         <Btn
-          label="Add student"
+          label={t('m.class.addStudent')}
           icon="check"
           disabled={!newName.trim() || !newRoll.trim()}
           onPress={() => {
             const roll = newRoll.trim().replace(/^0+(?=\d)/, '');
             if (roster.some((x) => x.rollNo === roll)) {
-              Alert.alert(
-                'Roll number in use',
-                `Another student in this class already has roll ${roll}.`,
-              );
+              Alert.alert(t('m.class.rollUsed'), t('m.class.rollUsedBody', { n: roll }));
               return;
             }
             addStudent({ id: newId(), classId, name: newName.trim(), rollNo: roll });

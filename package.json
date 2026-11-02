@@ -23,7 +23,9 @@
     "dev:site": "npm run dev -w @progressflow/site",
     "build:web": "npm run build -w @progressflow/web",
     "build:site": "npm run build -w @progressflow/site",
-    "test:e2e": "npm exec -w @progressflow/server -- tsx test/e2e.ts"
+    "test:e2e": "npm exec -w @progressflow/server -- tsx test/e2e.ts",
+    "test:i18n": "npm test -w @progressflow/shared",
+    "test:e2e:student": "npm exec -w @progressflow/server -- tsx test/e2e-student.ts"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^8.20.0",

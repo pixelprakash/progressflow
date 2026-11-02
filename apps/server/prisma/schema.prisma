@@ -217,6 +217,12 @@ model Assessment {
   assessorId     String
   kind           AssessmentKind @default(regular)
   note           String         @default("")
+  /// Self/peer reviews point at the teacher-assessed piece they are about.
+  ofAssessmentId String?
+  /// Teacher has opened this piece for classmates to review.
+  peerOpen       Boolean        @default(false)
+  /// Peer reviews stay hidden from the author until the teacher approves them.
+  approved       Boolean        @default(true)
   submittedAt    DateTime?
   serverSyncedAt DateTime?
   createdAt      DateTime     @default(now())
@@ -230,7 +236,11 @@ model Assessment {
   voiceNotes      VoiceNote[]
   attachments     FeedbackAttachment[]
   reviewResponses ReviewResponse[]
+  reviewOf        Assessment?      @relation("ReviewOf", fields: [ofAssessmentId], references: [id])
+  reviews         Assessment[]     @relation("ReviewOf")
 
+  @@unique([ofAssessmentId, assessorType, assessorId])
+  @@index([ofAssessmentId])
   @@index([assignmentId])
   @@index([studentId])
   @@index([assessorType, assessorId])

@@ -1,5 +1,7 @@
+import { randomBytes } from 'node:crypto';
 import { Router } from 'express';
-import type { AnnotationStroke, CaptureQuality, Language } from '@progressflow/shared';
+import { z } from 'zod';
+import type { AnnotationStroke, CaptureQuality, Language, ReviewView } from '@progressflow/shared';
 import type {
   ClassDetail,
   ClassSummary,
@@ -33,7 +35,7 @@ async function load(teacherId: string) {
     orderBy: [{ grade: 'asc' }, { section: 'asc' }],
   });
   const assessments = await prisma.assessment.findMany({
-    where: { deletedAt: null, assignment: { klass: { teacherId } } },
+    where: { deletedAt: null, assessorType: 'teacher', assignment: { klass: { teacherId } } },
     include: {
       criterionScores: { where: { deletedAt: null } },
       photos: { where: { deletedAt: null }, orderBy: { createdAt: 'asc' } },
@@ -121,6 +123,14 @@ dashboardRouter.get('/overview', async (req, res) => {
       students: d.klasses.reduce((n, k) => n + k.enrollments.length, 0),
       submissions: subs.length,
       waiting: subs.filter(isWaiting).length,
+      pendingReviews: await prisma.assessment.count({
+        where: {
+          assessorType: 'peer',
+          approved: false,
+          deletedAt: null,
+          assignment: { klass: { teacherId: req.teacherId! } },
+        },
+      }),
     },
     average: avg === null ? null : round(avg),
     classes: d.klasses.map((k) => classSummary(k, subs)),
@@ -148,6 +158,7 @@ dashboardRouter.get('/classes/:id', async (req, res) => {
         latestAverage: scored.length ? round(scored[scored.length - 1]!.average!) : null,
         firstAverage: scored.length ? round(scored[0]!.average!) : null,
         history: points(mine),
+        joinCode: e.student.joinCode,
       };
     })
     .sort((a, b) => (parseInt(a.rollNo, 10) || 0) - (parseInt(b.rollNo, 10) || 0));
@@ -212,9 +223,38 @@ dashboardRouter.get('/submissions/:id', async (req, res) => {
       attachments: { where: { deletedAt: null }, orderBy: { createdAt: 'asc' } },
     },
   });
+  const reviewRows = await prisma.assessment.findMany({
+    where: { ofAssessmentId: summary.id, deletedAt: null },
+    include: { criterionScores: true, reviewResponses: true },
+    orderBy: { createdAt: 'asc' },
+  });
+  const reviewers = await prisma.student.findMany({
+    where: { id: { in: reviewRows.map((r) => r.assessorId) } },
+    select: { id: true, displayName: true },
+  });
+  const nameOf = new Map(reviewers.map((s) => [s.id, s.displayName]));
+  const view = (r: (typeof reviewRows)[number]): ReviewView => ({
+    id: r.id,
+    scores: Object.fromEntries(r.criterionScores.map((s) => [s.criterionKey, s.level])),
+    answers: r.reviewResponses.map((a) => ({
+      promptKey: a.promptKey,
+      choice: (a.choice as ReviewView['answers'][number]['choice']) ?? null,
+      text: a.text,
+    })),
+    createdAt: r.createdAt.toISOString(),
+    approved: r.approved,
+    byName: nameOf.get(r.assessorId) ?? '',
+  });
+  const self = reviewRows.find((r) => r.assessorType === 'self');
+
   const out: SubmissionDetail = {
     summary,
     note: full.note,
+    peerOpen: full.peerOpen,
+    reviews: {
+      self: self ? view(self) : null,
+      peers: reviewRows.filter((r) => r.assessorType === 'peer').map(view),
+    },
     pages: full.photos.map((p) => ({
       id: p.id,
       width: p.width,
@@ -239,4 +279,73 @@ dashboardRouter.get('/submissions/:id', async (req, res) => {
     })),
   };
   res.json(out);
+});
+
+// --- teacher actions on student reviews and join codes --------------------------
+
+const owned = (teacherId: string) => ({ assignment: { klass: { teacherId, deletedAt: null } } });
+
+/** Open or close a piece for classmates to review. */
+dashboardRouter.post('/submissions/:id/peer-open', async (req, res) => {
+  const body = z.object({ open: z.boolean() }).safeParse(req.body);
+  if (!body.success) return fail(res, 400, 'invalid', 'send { open: true | false }');
+  const found = await prisma.assessment.findFirst({
+    where: {
+      id: req.params.id,
+      assessorType: 'teacher',
+      deletedAt: null,
+      ...owned(req.teacherId!),
+    },
+    select: { id: true },
+  });
+  if (!found) return fail(res, 404, 'not_found', 'no such submission');
+  await prisma.assessment.update({ where: { id: found.id }, data: { peerOpen: body.data.open } });
+  res.json({ ok: true, open: body.data.open });
+});
+
+/** Approve (or hide again) a classmate's review. The author sees it only while approved. */
+dashboardRouter.post('/reviews/:id/approve', async (req, res) => {
+  const body = z.object({ approved: z.boolean() }).safeParse(req.body);
+  if (!body.success) return fail(res, 400, 'invalid', 'send { approved: true | false }');
+  const found = await prisma.assessment.findFirst({
+    where: { id: req.params.id, assessorType: 'peer', deletedAt: null, ...owned(req.teacherId!) },
+    select: { id: true },
+  });
+  if (!found) return fail(res, 404, 'not_found', 'no such review');
+  await prisma.assessment.update({
+    where: { id: found.id },
+    data: { approved: body.data.approved },
+  });
+  res.json({ ok: true, approved: body.data.approved });
+});
+
+const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const newCode = () => Array.from(randomBytes(6), (b) => CODE_CHARS[b % CODE_CHARS.length]).join('');
+
+/** Replace a student's join code; the old one stops working at once. */
+dashboardRouter.post('/students/:id/join-code', async (req, res) => {
+  const found = await prisma.student.findFirst({
+    where: {
+      id: req.params.id,
+      deletedAt: null,
+      enrollments: {
+        some: { deletedAt: null, klass: { teacherId: req.teacherId!, deletedAt: null } },
+      },
+    },
+    select: { id: true },
+  });
+  if (!found) return fail(res, 404, 'not_found', 'no such student');
+  for (let i = 0; i < 5; i++) {
+    try {
+      const s = await prisma.student.update({
+        where: { id: found.id },
+        data: { joinCode: newCode() },
+        select: { joinCode: true },
+      });
+      return res.json({ joinCode: s.joinCode });
+    } catch (e) {
+      if ((e as { code?: string }).code !== 'P2002') throw e; // collided with another code: try again
+    }
+  }
+  return fail(res, 500, 'internal', 'could not make a new code, try again');
 });

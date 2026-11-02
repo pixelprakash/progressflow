@@ -1,5 +1,6 @@
 import type { AnnotationStroke, CaptureQuality } from './entities.js';
 import type { AssessmentKind, AttachmentKind, Language } from './enums.js';
+import type { ReviewView } from './student.js';
 
 /** Read-only dashboard responses (server -> web). Scores are criterion key -> level 1..4. */
 
@@ -35,7 +36,13 @@ export interface ClassSummary {
 }
 
 export interface Overview {
-  counts: { classes: number; students: number; submissions: number; waiting: number };
+  counts: {
+    classes: number;
+    students: number;
+    submissions: number;
+    waiting: number;
+    pendingReviews: number;
+  };
   average: number | null;
   classes: ClassSummary[];
   recent: SubmissionSummary[];
@@ -55,6 +62,8 @@ export interface StudentRow {
   latestAverage: number | null;
   firstAverage: number | null;
   history: TimePoint[];
+  /** The code this student types to open their portal. */
+  joinCode: string;
 }
 
 export interface ClassDetail {
@@ -74,6 +83,9 @@ export interface StudentDetail {
 export interface SubmissionDetail {
   summary: SubmissionSummary;
   note: string;
+  /** Opened for classmates to review. */
+  peerOpen: boolean;
+  reviews: { self: ReviewView | null; peers: ReviewView[] };
   pages: {
     id: string;
     width: number;

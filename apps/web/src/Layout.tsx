@@ -2,9 +2,11 @@ import { NavLink, Outlet } from 'react-router-dom';
 import type { Overview } from '@progressflow/shared';
 import { useAuth } from './auth';
 import { useApi } from './data';
+import { LanguageSwitch, useLang } from './i18n';
 
 export function Layout() {
   const { user, logout } = useAuth();
+  const { t } = useLang();
   const { data, error, loading } = useApi<Overview>('/v1/overview');
 
   return (
@@ -18,28 +20,31 @@ export function Layout() {
         </div>
         <nav aria-label="Main">
           <NavLink to="/" end>
-            Overview
+            {t('nav.overview')}
           </NavLink>
-          <p className="nav-h">Classes</p>
+          <p className="nav-h">{t('nav.classes')}</p>
           {data?.classes.map((c) => (
             <NavLink key={c.id} to={`/classes/${c.id}`}>
-              Class {c.label}
+              {t('common.class', { label: c.label })}
               {c.waiting > 0 && (
-                <span className="dot" title={`${c.waiting} to evaluate`}>
+                <span className="dot" title={t('ov.waiting', { n: c.waiting })}>
                   {c.waiting}
                 </span>
               )}
             </NavLink>
           ))}
-          {data && data.classes.length === 0 && <span className="muted small pad">None yet</span>}
+          {data && data.classes.length === 0 && (
+            <span className="muted small pad">{t('nav.none')}</span>
+          )}
         </nav>
         <div className="side-foot">
+          <LanguageSwitch />
           <div className="who">
             <strong>{user?.name}</strong>
             <span className="muted small">{user?.school}</span>
           </div>
           <button className="ghost" onClick={() => void logout()}>
-            Sign out
+            {t('common.signOut')}
           </button>
         </div>
       </aside>
@@ -49,7 +54,11 @@ export function Layout() {
             {error}
           </p>
         )}
-        {loading && !data ? <p className="muted">Loading…</p> : <Outlet context={data} />}
+        {loading && !data ? (
+          <p className="muted">{t('common.loading')}</p>
+        ) : (
+          <Outlet context={data} />
+        )}
       </main>
     </div>
   );
