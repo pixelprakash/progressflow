@@ -11,6 +11,7 @@ import { theme } from '../theme';
 import { Btn, Chip, Header, Icon, IconBtn, Sheet } from '../components/ui';
 import { WebAccount } from '../components/WebAccount';
 import { ClassSheet } from '../components/ClassSheet';
+import { OtpStep } from '../components/OtpStep';
 
 /** The teacher's classes, grouped by grade, one card per section. */
 export function HomeScreen({
@@ -21,9 +22,10 @@ export function HomeScreen({
   onRubric: () => void;
 }) {
   const { data, loadSample } = useStore();
-  const { current, logout } = useAuth();
+  const { current, logout, markVerified } = useAuth();
   const { t, lang, setLang } = useLang();
   const [profile, setProfile] = useState(false);
+  const [verifying, setVerifying] = useState(false);
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<ClassRoom | undefined>();
 
@@ -135,6 +137,21 @@ export function HomeScreen({
             <Text style={s.grade}>{current.name}</Text>
             <Text style={s.meta}>{current.school}</Text>
             <Text style={s.meta}>{current.phone}</Text>
+            {current.phoneVerified ? (
+              <Text style={[s.meta, { color: theme.color.success, fontWeight: '700' }]}>
+                ✓ {t('m.otp.verified')}
+              </Text>
+            ) : (
+              <Btn
+                label={t('m.otp.verifyNow')}
+                icon="cellphone-check"
+                kind="outline"
+                onPress={() => {
+                  setProfile(false);
+                  setVerifying(true);
+                }}
+              />
+            )}
             <Text style={s.meta}>{t('m.home.autoLock')}</Text>
           </>
         )}
@@ -161,6 +178,19 @@ export function HomeScreen({
         />
       </Sheet>
 
+      <Sheet visible={verifying} onClose={() => setVerifying(false)} title={t('m.otp.title')}>
+        {current && verifying && (
+          <OtpStep
+            phone={current.phone}
+            onVerified={() => {
+              void markVerified(current.id);
+              setVerifying(false);
+            }}
+            onBack={() => setVerifying(false)}
+            backLabel={t('common.cancel')}
+          />
+        )}
+      </Sheet>
       <ClassSheet visible={adding} onClose={() => setAdding(false)} />
       <ClassSheet visible={!!editing} editing={editing} onClose={() => setEditing(undefined)} />
     </View>

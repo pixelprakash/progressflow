@@ -41,3 +41,5 @@ tmp/
 .data/
 apps/mobile/.test-out/
 apps/mobile/test/*.zip
+release/
+apps/mobile/google-services.json

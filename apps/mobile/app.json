@@ -57,6 +57,10 @@
         {
           "android": {
             "usesCleartextTraffic": true
+          },
+          "ios": {
+            "useFrameworks": "static",
+            "deploymentTarget": "16.0"
           }
         }
       ]

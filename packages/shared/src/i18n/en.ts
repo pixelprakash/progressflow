@@ -708,6 +708,28 @@ export const en = {
   'rb.resetTitle': 'Reset the rubric?',
   'rb.resetBody':
     'Your changes to the criteria and level descriptions will be replaced by the standard four criteria.',
+  'm.otp.title': 'Verify your number',
+  'm.otp.sending': 'Sending a code to {phone}…',
+  'm.otp.sent': 'We sent a 6-digit code to {phone}.',
+  'm.otp.failed': 'The code could not be sent.',
+  'm.otp.demo': 'Demo mode: no SMS is sent. Enter {code}.',
+  'm.otp.code': 'Verification code',
+  'm.otp.verify': 'Verify',
+  'm.otp.resendIn': 'Send again in {n}s',
+  'm.otp.resend': 'Send again',
+  'm.otp.skip': 'Skip for now (no connection)',
+  'm.otp.change': 'Use a different number',
+  'm.otp.errCode': 'That code is not right. Try again.',
+  'm.otp.errExpired': 'That code has expired. Send a new one.',
+  'm.otp.errMany': 'Too many tries. Wait a while, then try again.',
+  'm.otp.errNet': 'No connection. Check the internet and send again.',
+  'm.otp.errSend': 'The code could not be sent. Try again.',
+  'm.otp.resetTitle': 'Reset PIN for {name}',
+  'm.otp.noPhone': 'No access to this number? Erase the account instead',
+  'm.otp.newPinTitle': 'Choose a new PIN',
+  'm.otp.savePin': 'Save PIN and sign in',
+  'm.otp.verified': 'Phone number verified',
+  'm.otp.verifyNow': 'Verify phone number',
 } as const;
 
 export type TKey = keyof typeof en;

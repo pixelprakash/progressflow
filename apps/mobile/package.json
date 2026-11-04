@@ -16,6 +16,8 @@
   "dependencies": {
     "@expo/vector-icons": "~14.0.4",
     "@progressflow/shared": "*",
+    "@react-native-firebase/app": "^21.14.0",
+    "@react-native-firebase/auth": "^21.14.0",
     "@react-native-ml-kit/text-recognition": "^2.0.0",
     "buffer": "^5.7.1",
     "expo": "~52.0.0",

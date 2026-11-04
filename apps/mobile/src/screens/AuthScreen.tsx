@@ -17,6 +17,7 @@ import type { Teacher } from '../auth';
 import { useLang } from '../lang';
 import { theme } from '../theme';
 import { Btn, Chip, Icon } from '../components/ui';
+import { OtpStep } from '../components/OtpStep';
 import { initials } from '../domain';
 
 const LANGS: { code: Language; label: string }[] = [
@@ -25,11 +26,11 @@ const LANGS: { code: Language; label: string }[] = [
   { code: 'te', label: 'తెలుగు' },
 ];
 
-type Mode = 'pick' | 'pin' | 'register';
+type Mode = 'pick' | 'pin' | 'register' | 'verify' | 'reset' | 'newpin';
 
 /** Sign in (pick a teacher, enter PIN) or create a local teacher account. */
 export function AuthScreen() {
-  const { accounts, login, register, removeAccount } = useAuth();
+  const { accounts, login, register, resetPin, removeAccount } = useAuth();
   const { t, lang, setLang } = useLang();
   const insets = useSafeAreaInsets();
   const [mode, setMode] = useState<Mode>(accounts.length ? 'pick' : 'register');
@@ -89,16 +90,49 @@ export function AuthScreen() {
                       : '';
     setError(problem);
     if (problem) return;
+    go('verify');
+  }
+
+  /** `verified`: the code was entered; false when the teacher skipped it (offline start). */
+  async function finishRegister(verified: boolean) {
     setBusy(true);
     try {
-      await register({ name, school, mobile: m, language, pin: pin1 });
+      await register({
+        name,
+        school,
+        mobile: mobile.replace(/\s/g, ''),
+        language,
+        pin: pin1,
+        verified,
+      });
+    } catch {
+      setError(t('m.auth.errFail'));
+      setBusy(false);
+      go('register');
+    }
+  }
+
+  async function saveNewPin() {
+    if (!who) return;
+    const problem = !PIN_RE.test(pin1)
+      ? t('m.auth.errPinFmt')
+      : weakPin(pin1)
+        ? t('m.auth.errPinWeak')
+        : pin1 !== pin2
+          ? t('m.auth.errPinMatch')
+          : '';
+    setError(problem);
+    if (problem) return;
+    setBusy(true);
+    try {
+      await resetPin(who.id, pin1);
     } catch {
       setError(t('m.auth.errFail'));
       setBusy(false);
     }
   }
 
-  function forgot() {
+  function erase() {
     if (!who) return;
     Alert.alert(t('m.auth.forgotTitle'), t('m.auth.forgotBody', { name: who.name }), [
       { text: t('common.cancel'), style: 'cancel' },
@@ -219,7 +253,14 @@ export function AuthScreen() {
               onPress={() => void signIn()}
               disabled={busy || !PIN_RE.test(pin)}
             />
-            <Pressable onPress={forgot} hitSlop={8}>
+            <Pressable
+              onPress={() => {
+                setPin1('');
+                setPin2('');
+                go('reset');
+              }}
+              hitSlop={8}
+            >
               <Text style={s.link}>{t('m.auth.forgot')}</Text>
             </Pressable>
             <Pressable onPress={() => go('pick')} hitSlop={8}>
@@ -318,6 +359,56 @@ export function AuthScreen() {
                 <Text style={s.link}>{t('m.auth.have')}</Text>
               </Pressable>
             )}
+          </View>
+        )}
+
+        {mode === 'verify' && (
+          <View style={s.form}>
+            <OtpStep
+              phone={`+91${mobile.replace(/\s/g, '')}`}
+              onVerified={() => void finishRegister(true)}
+              onSkip={() => void finishRegister(false)}
+              onBack={() => go('register')}
+            />
+          </View>
+        )}
+
+        {mode === 'reset' && who && (
+          <View style={s.form}>
+            <Text style={s.h}>{t('m.otp.resetTitle', { name: who.name })}</Text>
+            <OtpStep phone={who.phone} onVerified={() => go('newpin')} onBack={() => go('pin')} />
+            <Pressable onPress={erase} hitSlop={8}>
+              <Text style={[s.link, { color: theme.color.danger }]}>{t('m.otp.noPhone')}</Text>
+            </Pressable>
+          </View>
+        )}
+
+        {mode === 'newpin' && who && (
+          <View style={s.form}>
+            <Text style={s.h}>{t('m.otp.newPinTitle')}</Text>
+            <Field
+              label={t('m.auth.createPin')}
+              value={pin1}
+              onChange={(v) => setPin1(v.replace(/\D/g, ''))}
+              secure
+              max={6}
+              numeric
+            />
+            <Field
+              label={t('m.auth.confirmPin')}
+              value={pin2}
+              onChange={(v) => setPin2(v.replace(/\D/g, ''))}
+              secure
+              max={6}
+              numeric
+            />
+            {error ? <Text style={s.error}>{error}</Text> : null}
+            <Btn
+              label={t('m.otp.savePin')}
+              icon="check"
+              onPress={() => void saveNewPin()}
+              disabled={busy}
+            />
           </View>
         )}
       </ScrollView>

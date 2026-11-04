@@ -18,8 +18,8 @@ import type { Language, TKey } from '@progressflow/shared';
  * Local teacher accounts (offline-first). The PIN hash lives in the platform
  * keystore (SecureStore); the profile is a small JSON file. This locks the app
  * and separates teachers sharing a phone — it is NOT server authentication.
- * ROADMAP plans Firebase phone-OTP; when that lands, replace register/login
- * here and keep the `Teacher` shape (it mirrors `User` in @progressflow/shared).
+ * The phone number can be confirmed with a one-time code (src/otp.ts); that proves
+ * the number only and is what allows a forgotten PIN to be reset without erasing data.
  */
 
 export interface Teacher {
@@ -29,6 +29,8 @@ export interface Teacher {
   /** E.164, e.g. +919876543210 */
   phone: string;
   language: Language;
+  /** True once the phone number was confirmed with a one-time code. */
+  phoneVerified?: boolean;
   /** Folder under progressflow/ holding this teacher's data ('' = first-release data). */
   dataDir: string;
   createdAt: string;
@@ -41,6 +43,8 @@ export interface RegisterInput {
   mobile: string;
   language: Language;
   pin: string;
+  /** The number was confirmed with a code before registering. */
+  verified?: boolean;
 }
 
 /** A failed sign-in carries a dictionary key (and a number to put in it); the screen translates it. */
@@ -85,6 +89,10 @@ interface Auth {
   register: (input: RegisterInput) => Promise<void>;
   login: (id: string, pin: string) => Promise<LoginResult>;
   logout: () => void;
+  /** After the phone number was proved with a code: sets a new PIN, clears the lock-out and signs in. */
+  resetPin: (id: string, pin: string) => Promise<void>;
+  /** Records that the number was confirmed (for accounts that skipped it at registration). */
+  markVerified: (id: string) => Promise<void>;
   /** Erases the account AND its data from this phone. */
   removeAccount: (id: string) => Promise<void>;
 }
@@ -164,6 +172,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         school: input.school.trim(),
         phone: `+91${input.mobile}`,
         language: input.language,
+        phoneVerified: !!input.verified,
         dataDir: adopt ? '' : `accounts/${id}/`,
         createdAt: new Date().toISOString(),
       };
@@ -220,6 +229,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [accounts, saveSession],
   );
 
+  const resetPin = useCallback(
+    async (id: string, pin: string) => {
+      const teacher = accounts.find((t) => t.id === id);
+      if (!teacher) return;
+      const salt = Crypto.randomUUID();
+      await SecureStore.setItemAsync(
+        keyOf('pf_pin', id),
+        JSON.stringify({ salt, hash: await hashPin(pin, salt) }),
+      );
+      await SecureStore.deleteItemAsync(keyOf('pf_lock', id)).catch(() => {});
+      const updated = { ...teacher, phoneVerified: true };
+      await persistAccounts(accounts.map((a) => (a.id === id ? updated : a)));
+      await saveSession(id);
+      setCurrent(updated);
+    },
+    [accounts, persistAccounts, saveSession],
+  );
+
+  const markVerified = useCallback(
+    async (id: string) => {
+      const updated = accounts.map((a) => (a.id === id ? { ...a, phoneVerified: true } : a));
+      await persistAccounts(updated);
+      setCurrent((c) => (c && c.id === id ? { ...c, phoneVerified: true } : c));
+    },
+    [accounts, persistAccounts],
+  );
+
   const logout = useCallback(() => {
     setCurrent(null);
     void saveSession(null);
@@ -244,8 +280,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo<Auth>(
-    () => ({ loading, accounts, current, register, login, logout, removeAccount }),
-    [loading, accounts, current, register, login, logout, removeAccount],
+    () => ({
+      loading,
+      accounts,
+      current,
+      register,
+      login,
+      logout,
+      resetPin,
+      markVerified,
+      removeAccount,
+    }),
+    [loading, accounts, current, register, login, logout, resetPin, markVerified, removeAccount],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
