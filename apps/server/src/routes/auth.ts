@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import rateLimit from 'express-rate-limit';
+import { rateLimit } from 'express-rate-limit';
 import { LoginBody, RegisterBody } from '@progressflow/shared';
 import type { AuthResponse, Language, TeacherProfile } from '@progressflow/shared';
 import { config } from '../config.js';

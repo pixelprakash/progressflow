@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import rateLimit from 'express-rate-limit';
+import { rateLimit } from 'express-rate-limit';
 import type { Prisma } from '@prisma/client';
 import { RUBRIC_GUIDES, ReviewSubmitBody, StudentLoginBody } from '@progressflow/shared';
 import type {
