@@ -10,6 +10,7 @@ import {
 import type { ReactNode } from 'react';
 import { AppState } from 'react-native';
 import * as FileSystem from 'expo-file-system';
+import * as ImageManipulator from 'expo-image-manipulator';
 import * as SecureStore from 'expo-secure-store';
 import type { AuthResponse, MediaWanted, SyncPushResponse } from '@progressflow/shared';
 import { MOBILE_RE, useAuth } from './auth';
@@ -321,6 +322,26 @@ export function useSync(): Sync {
   return s;
 }
 
+/**
+ * The dashboard needs a good picture, not the 12-megapixel original (which stays on the phone).
+ * A 2,000 px copy at JPEG 0.8 is well under 1 MB, which also fits hosts that cap a request near
+ * 4.5 MB. Falls back to the original if it cannot be shrunk.
+ */
+const UPLOAD_LONG_EDGE = 2000;
+async function shrunk(uri: string, width: number, height: number): Promise<string> {
+  if (Math.max(width, height) <= UPLOAD_LONG_EDGE) return uri;
+  try {
+    const out = await ImageManipulator.manipulateAsync(
+      uri,
+      [{ resize: width >= height ? { width: UPLOAD_LONG_EDGE } : { height: UPLOAD_LONG_EDGE } }],
+      { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG },
+    );
+    return out.uri;
+  } catch {
+    return uri;
+  }
+}
+
 /** Uploads the media the server asked for. Returns ids of submissions where something failed. */
 async function uploadMedia(
   cfg: Config,
@@ -328,11 +349,19 @@ async function uploadMedia(
   wanted: MediaWanted,
 ): Promise<Set<string>> {
   const failed = new Set<string>();
-  const put = async (kind: string, id: string, uri: string, ext: string, owner: string) => {
+  const put = async (
+    kind: string,
+    id: string,
+    uri: string,
+    ext: string,
+    owner: string,
+    size?: { width: number; height: number },
+  ) => {
+    const sendUri = size ? await shrunk(uri, size.width, size.height) : uri;
     try {
       const r = await FileSystem.uploadAsync(
         `${cfg.serverUrl}/v1/media/${kind}/${id}?ext=${ext}`,
-        uri,
+        sendUri,
         {
           httpMethod: 'PUT',
           uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
@@ -345,12 +374,15 @@ async function uploadMedia(
       if (r.status !== 200) failed.add(owner);
     } catch {
       failed.add(owner);
+    } finally {
+      if (sendUri !== uri) FileSystem.deleteAsync(sendUri, { idempotent: true }).catch(() => {});
     }
   };
 
   for (const s of batch) {
     for (const p of s.pages)
-      if (wanted.pages.includes(p.id)) await put('page', p.id, p.uri, 'jpg', s.id);
+      if (wanted.pages.includes(p.id))
+        await put('page', p.id, p.uri, 'jpg', s.id, { width: p.width, height: p.height });
     if (s.voice && wanted.voice.includes(s.id)) await put('voice', s.id, s.voice.uri, 'm4a', s.id);
     for (const a of s.attachments) {
       const w = wanted.attachments.find((x) => x.id === a.id);
