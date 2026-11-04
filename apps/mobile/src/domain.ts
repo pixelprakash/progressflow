@@ -97,7 +97,7 @@ export interface AssessmentType {
 }
 
 export interface Prefs {
-  /** 'original' keeps the camera photo untouched; 'scan' uses the document scanner (auto-crop, may enhance). */
+  /** 'scan' finds the page edges and crops, with no filters; 'original' keeps the camera photo whole. */
   captureMode: 'original' | 'scan';
 }
 
@@ -140,7 +140,7 @@ export const DEFAULT_TYPES: AssessmentType[] = [
 export const isBuiltinType = (id: string) => id in BUILTIN_TYPE_ICONS;
 export const typeIcon = (id: string) => BUILTIN_TYPE_ICONS[id] ?? 'tag-outline';
 
-export const DEFAULT_PREFS: Prefs = { captureMode: 'original' };
+export const DEFAULT_PREFS: Prefs = { captureMode: 'scan' };
 
 /** An evaluation counts as saved when the teacher pressed Save and has not changed it since. */
 export const isSaved = (s: Pick<Submission, 'completedAt' | 'updatedAt'>) =>

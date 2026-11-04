@@ -1,5 +1,5 @@
-import { useRef, useState } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { AppState, Image, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -29,7 +29,7 @@ export function BatchCaptureScreen({
   const { data, addInbox, removeInbox } = useStore();
   const { t } = useLang();
   const insets = useSafeAreaInsets();
-  const [perm, requestPerm] = useCameraPermissions();
+  const [perm, requestPerm, refreshPerm] = useCameraPermissions();
   const cam = useRef<CameraView>(null);
   const [flash, setFlash] = useState(false);
   const [shots, setShots] = useState(0);
@@ -37,6 +37,14 @@ export function BatchCaptureScreen({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
   const klass = data.classes.find((c) => c.id === classId);
+
+  // Coming back from the phone's settings page: pick up the new permission without a restart.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (st) => {
+      if (st === 'active') void refreshPerm();
+    });
+    return () => sub.remove();
+  }, [refreshPerm]);
 
   if (!perm) return <View style={s.root} />;
 
@@ -51,7 +59,14 @@ export function BatchCaptureScreen({
         <View style={{ gap: 8, alignSelf: 'stretch', paddingHorizontal: theme.space.lg }}>
           {perm.canAskAgain ? (
             <Btn label={t('m.perm.allow')} icon="check" onPress={() => void requestPerm()} />
-          ) : null}
+          ) : (
+            // Android stops showing the prompt after repeated refusals; settings is the only way back.
+            <Btn
+              label={t('m.perm.openSettings')}
+              icon="cog-outline"
+              onPress={() => void Linking.openSettings()}
+            />
+          )}
           <Btn label={t('common.back')} kind="outline" onPress={onDone} />
         </View>
       </View>

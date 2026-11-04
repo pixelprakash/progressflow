@@ -11,7 +11,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "tsx test/logic.test.ts",
     "lint": "eslint .",
-    "eas-build-post-install": "npm --prefix ../.. run build:shared"
+    "eas-build-post-install": "npm --prefix ../.. run build:shared && npm --prefix ../.. exec patch-package"
   },
   "dependencies": {
     "@expo/vector-icons": "~14.0.4",

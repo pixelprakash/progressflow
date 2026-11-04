@@ -547,12 +547,11 @@ export const en = {
   'm.cap.shutter': 'Take photo',
   'm.cap.done': 'Done · {n}',
   'm.cap.fail': 'That photo did not save. Try again.',
-  'm.cap.modeOriginal': 'Original photo',
-  'm.cap.modeOriginalHint':
-    'Keeps the camera photo exactly as taken, with no cropping or filters. Best for marking and for records.',
-  'm.cap.modeScan': 'Document scan',
+  'm.cap.modeOriginal': 'Full photo',
+  'm.cap.modeOriginalHint': 'The whole camera photo, exactly as taken. No cropping.',
+  'm.cap.modeScan': 'Edge detect + crop',
   'm.cap.modeScanHint':
-    'Finds the page edges and crops. The scanner may also lighten or sharpen the photo.',
+    'Finds the page edges live and crops straight. No filters, no brightening — the paper looks as it did.',
   'm.perm.title': 'Before you start',
   'm.perm.lead': 'ProgressFlow asks for two permissions, only for these jobs.',
   'm.perm.camera': 'Camera',

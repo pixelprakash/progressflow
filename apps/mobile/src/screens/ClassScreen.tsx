@@ -190,22 +190,20 @@ export function ClassScreen({
           />
           <View style={s.modeRow}>
             <Chip
-              label={t('m.cap.modeOriginal')}
-              icon="image-outline"
-              selected={prefs.captureMode === 'original'}
-              onPress={() => setPrefs({ captureMode: 'original' })}
-            />
-            <Chip
               label={t('m.cap.modeScan')}
               icon="scanner"
               selected={prefs.captureMode === 'scan'}
               onPress={() => setPrefs({ captureMode: 'scan' })}
             />
+            <Chip
+              label={t('m.cap.modeOriginal')}
+              icon="image-outline"
+              selected={prefs.captureMode === 'original'}
+              onPress={() => setPrefs({ captureMode: 'original' })}
+            />
           </View>
           <Text style={s.meta}>
-            {prefs.captureMode === 'original'
-              ? t('m.cap.modeOriginalHint')
-              : t('m.cap.modeScanHint')}
+            {prefs.captureMode === 'scan' ? t('m.cap.modeScanHint') : t('m.cap.modeOriginalHint')}
           </Text>
           <Btn
             label={t('m.class.gallery')}

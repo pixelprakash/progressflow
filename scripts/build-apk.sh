@@ -4,7 +4,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 source "$ROOT/scripts/android-env.sh"
-cd "$ROOT" && npm run build:shared >/dev/null
+cd "$ROOT" && npm run build:shared >/dev/null && npx patch-package >/dev/null   # scanner: crop only, no filters (patches/)
 cd "$ROOT/apps/mobile"
 if [ ! -d android ]; then
   cp package.json /tmp/pf-package.json.bak
