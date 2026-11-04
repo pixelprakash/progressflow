@@ -4,7 +4,9 @@ import { fileURLToPath } from 'node:url';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express from 'express';
-import helmet from 'helmet';
+import type { RequestHandler } from 'express';
+import helmetImport from 'helmet';
+import type { HelmetOptions } from 'helmet';
 import { pinoHttp } from 'pino-http';
 import { config } from './config.js';
 import { logger } from './logger.js';
@@ -14,6 +16,14 @@ import { healthRouter } from './routes/health.js';
 import { mediaRouter } from './routes/media.js';
 import { studentRouter } from './routes/student.js';
 import { syncRouter } from './routes/sync.js';
+
+/**
+ * helmet ships separate ESM and CJS typings, and on some installs (Vercel's) TypeScript picks the
+ * CJS one, where the default import is the module object rather than the function. At runtime
+ * either works, so take whichever is callable.
+ */
+const helmet = ((helmetImport as unknown as { default?: unknown }).default ??
+  helmetImport) as unknown as (options?: HelmetOptions) => RequestHandler;
 
 const here = dirname(fileURLToPath(import.meta.url));
 const WEB_DIST = resolve(here, '../../web/dist');
