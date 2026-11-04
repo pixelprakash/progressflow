@@ -50,17 +50,22 @@ The mobile app uses native modules, so it needs a dev/EAS build, not Expo Go —
 see [docs/build-apk.md](docs/build-apk.md).
 
 Mobile app, 4 Nov 2026 (owner's call, still ahead of Spike 1; all in `store.tsx`):
+
 - Capture is batch-first and **original by default**: `BatchCaptureScreen` (expo-camera, no
   cropping or filters) → inbox → `InboxScreen` reads names (ML Kit, header first) and files
   papers on student profiles. The ML Kit document scanner is an opt-in mode and may enhance.
 - Assessment types (`AppData.types`) and the rubric (`AppData.rubric`) are teacher-editable.
-  `Submission.kind` is a free string; `syncMap.toServerKind` folds it to the server's four kinds
-  until the server learns teacher-defined types. Custom criterion keys sync as-is.
-- `Submission.completedAt` is set by the Save button (device-only for now, not synced).
+  `Submission.kind` is a free string and syncs as-is; the server keeps the teacher's types and
+  rubric in `User.settings` (`GET /v1/config`) and the web dashboard reads them. The student
+  portal still uses the standard four criteria (limit).
+- `Submission.completedAt` is set by the Save button and syncs; the dashboard's "waiting" means
+  photographed but not saved.
 - Reports (PDF/Word/Excel/CSV) are built in `src/reports/` from one neutral model; roster import
   in `src/import/roster.ts`; chart maths in `src/analytics.ts`. Logic tests: `npm run test:mobile`.
-- Deleting a class/student/submission erases its files on the phone but is **not** propagated to
-  the server (snapshot push only adds/updates).
+- Deleting a class/student/submission erases its files on the phone and records a tombstone
+  (`AppData.deleted`); the next push sends it and the server soft-deletes the rows (cascade),
+  erases the stored photos/recordings and closes the student's portal code. Foreign ids are ignored.
+- Server tests for all of this: `npm run test:e2e:v2` (needs `npm run dev:db` and `npm run dev:server`).
 
 ## Common commands
 

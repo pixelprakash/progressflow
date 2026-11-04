@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import type { StudentDetail } from '@progressflow/shared';
-import { fmt, kindKey, useApi } from '../data';
+import { fmt, useApi } from '../data';
+import { useTeacher } from '../teacher';
 import { useLang } from '../i18n';
 import { Loading, Stat, SubmissionCard } from '../components/bits';
 import { GrowthChart } from '../components/GrowthChart';
@@ -9,6 +10,7 @@ import { GrowthChart } from '../components/GrowthChart';
 export function StudentPage() {
   const { id } = useParams();
   const { t } = useLang();
+  const { kindLabel } = useTeacher();
   const { data, error, loading } = useApi<StudentDetail>(`/v1/students/${id}`);
   const [kind, setKind] = useState<string>('all');
   if (!data) return <Loading error={error} loading={loading} />;
@@ -51,7 +53,7 @@ export function StudentPage() {
       <div className="chips" role="group">
         {['all', 'sketch', 'regular', 'progress', 'portfolio'].map((k) => (
           <button key={k} className={`chip ${kind === k ? 'on' : ''}`} onClick={() => setKind(k)}>
-            {k === 'all' ? t('common.all') : t(kindKey(k))}
+            {k === 'all' ? t('common.all') : kindLabel(k)}
           </button>
         ))}
       </div>

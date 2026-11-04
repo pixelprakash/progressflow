@@ -3,6 +3,7 @@ import type { Overview } from '@progressflow/shared';
 import { useAuth } from './auth';
 import { useApi } from './data';
 import { LanguageSwitch, useLang } from './i18n';
+import { TeacherProvider } from './teacher';
 
 export function Layout() {
   const { user, logout } = useAuth();
@@ -57,7 +58,9 @@ export function Layout() {
         {loading && !data ? (
           <p className="muted">{t('common.loading')}</p>
         ) : (
-          <Outlet context={data} />
+          <TeacherProvider>
+            <Outlet context={data} />
+          </TeacherProvider>
         )}
       </main>
     </div>

@@ -50,7 +50,11 @@ export function OtpStep({
       .catch((e: unknown) => {
         if (cancelled) return;
         setState('failed');
-        setError(t(e instanceof OtpError ? e.key : 'm.otp.errSend'));
+        setError(
+          e instanceof OtpError
+            ? `${t(e.key)}${e.detail ? ` [${e.detail}]` : ''}`
+            : t('m.otp.errSend'),
+        );
       });
     return () => {
       cancelled = true;

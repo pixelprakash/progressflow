@@ -1,4 +1,4 @@
-import type { SyncPushBody, SyncSubmission } from '@progressflow/shared';
+import type { SyncCriterion, SyncPushBody, SyncSubmission, SyncType } from '@progressflow/shared';
 import type { AppData, Submission } from './domain';
 
 /**
@@ -11,21 +11,13 @@ export const extOf = (uri: string, fallback: string) => {
   return (m?.[1] ?? fallback).toLowerCase();
 };
 
-/**
- * The server stores four kinds. Core ones pass through; assignment, exams, quarterly
- * and anything the teacher invented are filed as 'regular' there until the server
- * learns the teacher's own types.
- */
-export function toServerKind(kind: string): SyncSubmission['kind'] {
-  return kind === 'sketch' || kind === 'progress' || kind === 'portfolio' ? kind : 'regular';
-}
-
 export function toSyncSubmission(s: Submission): SyncSubmission {
   const pageIds = new Set(s.pages.map((p) => p.id));
   return {
     id: s.id,
     studentId: s.studentId,
-    kind: toServerKind(s.kind),
+    kind: s.kind,
+    completedAt: s.completedAt ?? null,
     createdAt: s.createdAt,
     updatedAt: s.updatedAt,
     note: s.note,
@@ -48,8 +40,47 @@ export function toSyncSubmission(s: Submission): SyncSubmission {
   };
 }
 
+const cut = (v: string, n: number) => v.slice(0, n);
+
+/** The teacher's assessment types, trimmed to what the server accepts. Empty = the defaults. */
+export function toSyncTypes(data: AppData): SyncType[] {
+  return (data.types ?? []).map((t) => ({
+    id: t.id,
+    ...(t.label?.trim() ? { label: cut(t.label.trim(), 60) } : {}),
+  }));
+}
+
+/** The teacher's rubric, trimmed to what the server accepts; null = the standard four. */
+export function toSyncRubric(data: AppData): SyncCriterion[] | null {
+  if (!data.rubric?.length) return null;
+  return data.rubric.map((g) => ({
+    key: g.key,
+    name: cut(g.name, 80),
+    icon: cut(g.icon, 60),
+    color: /^#[0-9A-Fa-f]{6}$/.test(g.color) ? g.color : '#2E5AAC',
+    tagline: cut(g.tagline, 200),
+    askStudent: cut(g.askStudent, 300),
+    lookFor: g.lookFor
+      .slice(0, 6)
+      .map((l) => ({ title: cut(l.title, 80), text: cut(l.text, 400) })),
+    levels: {
+      1: cut(g.levels[1], 400),
+      2: cut(g.levels[2], 400),
+      3: cut(g.levels[3], 400),
+      4: cut(g.levels[4], 400),
+    },
+  }));
+}
+
 export function toPush(data: AppData, only: ReadonlySet<string> | null): SyncPushBody {
   return {
+    types: toSyncTypes(data),
+    rubric: toSyncRubric(data),
+    deleted: {
+      classes: data.deleted?.classes ?? [],
+      students: data.deleted?.students ?? [],
+      submissions: data.deleted?.submissions ?? [],
+    },
     classes: data.classes.map((c) => ({
       id: c.id,
       grade: c.grade,

@@ -1,7 +1,8 @@
-import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { dirname, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
+  DeleteObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
   PutObjectCommand,
@@ -98,4 +99,15 @@ export function describe(storageKey: string): { type: string; inline: boolean } 
   const ext = storageKey.split('.').pop()?.toLowerCase() ?? '';
   const type = TYPES[ext] ?? 'application/octet-stream';
   return { type, inline: INLINE.has(type) };
+}
+
+/** Removes a stored file. A key that is already gone is fine. */
+export async function remove(storageKey: string): Promise<void> {
+  if (usingS3) {
+    await client()
+      .send(new DeleteObjectCommand({ Bucket: config.S3_BUCKET, Key: storageKey }))
+      .catch(() => {});
+    return;
+  }
+  await rm(pathFor(storageKey), { force: true });
 }

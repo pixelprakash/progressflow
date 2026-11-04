@@ -3,7 +3,8 @@ import { Link, useParams } from 'react-router-dom';
 import { LANGUAGE_NAMES, levelLabel } from '@progressflow/shared';
 import type { PerformanceLevel, ReviewView, SubmissionDetail } from '@progressflow/shared';
 import { api } from '../api';
-import { fmt, kindKey, useApi } from '../data';
+import { fmt, useApi } from '../data';
+import { useTeacher } from '../teacher';
 import { useLang } from '../i18n';
 import { Loading } from '../components/bits';
 import { Answers } from '../components/Answers';
@@ -11,7 +12,8 @@ import { AnnotatedImage } from '../components/AnnotatedImage';
 
 export function SubmissionPage() {
   const { id } = useParams();
-  const { t, lang, guides, fmtDate } = useLang();
+  const { t, lang, fmtDate } = useLang();
+  const { guides, kindLabel } = useTeacher();
   const { data, error, loading, reload } = useApi<SubmissionDetail>(`/v1/submissions/${id}`);
   const [idx, setIdx] = useState(0);
   if (!data) return <Loading error={error} loading={loading} />;
@@ -32,7 +34,7 @@ export function SubmissionPage() {
       </p>
       <h1>{s.studentName}</h1>
       <p className="muted">
-        {t(kindKey(s.kind))} · {fmtDate(s.createdAt)} · {t('common.average')} {fmt(s.average)}
+        {kindLabel(s.kind)} · {fmtDate(s.createdAt)} · {t('common.average')} {fmt(s.average)}
       </p>
 
       <div className="two sub-layout">

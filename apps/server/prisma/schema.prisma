@@ -27,13 +27,6 @@ enum AssessorType {
   peer
 }
 
-enum AssessmentKind {
-  sketch
-  regular
-  progress
-  portfolio
-}
-
 enum AttachmentKind {
   image
   file
@@ -71,6 +64,8 @@ model User {
   languagePref String    @default("en")
   /// scrypt hash for web/mobile account login; null for users without a password
   passwordHash String?
+  /// The teacher's own assessment types and rubric, as last synced from the phone.
+  settings     Json?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   deletedAt    DateTime?
@@ -215,7 +210,10 @@ model Assessment {
   studentId      String
   assessorType   AssessorType
   assessorId     String
-  kind           AssessmentKind @default(regular)
+  /// The teacher's assessment type id ('assignment', 'exam1', a custom id, …). Names live in User.settings.
+  kind           String         @default("regular")
+  /// When the teacher pressed Save on the evaluation.
+  completedAt    DateTime?
   note           String         @default("")
   /// Self/peer reviews point at the teacher-assessed piece they are about.
   ofAssessmentId String?

@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { levelLabel } from '@progressflow/shared';
 import type { PerformanceLevel } from '@progressflow/shared';
 import { LANGUAGE_NAMES } from '@progressflow/shared';
-import { fmt, kindKey } from '../data';
+import { fmt, kindText } from '../data';
 import { useLang } from '../i18n';
 import { AnnotatedImage } from '../components/AnnotatedImage';
 import { Answers } from '../components/Answers';
@@ -30,7 +30,7 @@ export function StudentPiece() {
       <p>
         <Link to="/student">← {t('sp.backHome')}</Link>
       </p>
-      <h1>{t(kindKey(piece.kind))}</h1>
+      <h1>{kindText(t, piece.kind)}</h1>
       <p className="muted">
         {fmtDate(piece.createdAt)} · {t('common.average')} {fmt(piece.average)}
       </p>
@@ -43,7 +43,7 @@ export function StudentPiece() {
             width={page.width}
             height={page.height}
             strokes={page.strokes}
-            alt={t(kindKey(piece.kind))}
+            alt={kindText(t, piece.kind)}
           />
           {piece.pages.length > 1 && (
             <div className="thumbs">

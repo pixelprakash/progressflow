@@ -15,6 +15,7 @@ import type {
 } from '@progressflow/shared';
 import { config } from '../config.js';
 import { prisma } from '../db.js';
+import { kindLabeller } from '../services/kinds.js';
 import { STUDENT_COOKIE, fail, requireStudent } from '../auth/middleware.js';
 import { STUDENT_TTL_S, signToken } from '../auth/token.js';
 
@@ -37,7 +38,7 @@ type Enrolled = {
   id: string;
   displayName: string;
   rollNo: string;
-  enrollments: { klass: { id: string; grade: number; section: string } }[];
+  enrollments: { klass: { id: string; grade: number; section: string; teacherId: string } }[];
 };
 
 async function loadStudent(id: string): Promise<Enrolled | null> {
@@ -49,7 +50,9 @@ async function loadStudent(id: string): Promise<Enrolled | null> {
       rollNo: true,
       enrollments: {
         where: { deletedAt: null, klass: { deletedAt: null } },
-        select: { klass: { select: { id: true, grade: true, section: true } } },
+        select: {
+          klass: { select: { id: true, grade: true, section: true, teacherId: true } },
+        },
       },
     },
   });
@@ -162,6 +165,7 @@ studentRouter.get('/student/portal', requireStudent, async (req, res) => {
     orderBy: { createdAt: 'desc' },
   });
 
+  const kindFor = await kindLabeller(me.enrollments[0]?.klass.teacherId);
   const out: StudentPiece[] = pieces.map((p) => {
     const scores: Scores = Object.fromEntries(
       p.criterionScores.map((s) => [s.criterionKey, s.level]),
@@ -169,7 +173,7 @@ studentRouter.get('/student/portal', requireStudent, async (req, res) => {
     const mySelf = p.reviews.find((r) => r.assessorType === 'self' && r.assessorId === me.id);
     return {
       id: p.id,
-      kind: p.kind,
+      kind: kindFor(p.kind),
       createdAt: p.createdAt.toISOString(),
       pages: p.photos.map((x) => ({
         id: x.id,

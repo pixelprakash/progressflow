@@ -46,6 +46,18 @@ export type AnnotationTool = z.infer<typeof AnnotationTool>;
 export const AssessmentKind = z.enum(['sketch', 'regular', 'progress', 'portfolio']);
 export type AssessmentKind = z.infer<typeof AssessmentKind>;
 
+/**
+ * The id of a teacher's assessment type. Built-ins are 'assignment', 'exam1', 'exam2',
+ * 'quarterly', 'sketch', 'progress', 'portfolio' (and legacy 'regular'); a teacher can add
+ * their own, so on the wire it is any short id. Names live in `TeacherConfig.types`.
+ */
+export const AssessmentKindId = z
+  .string()
+  .min(1)
+  .max(40)
+  .regex(/^[A-Za-z0-9_-]+$/);
+export type AssessmentKindId = z.infer<typeof AssessmentKindId>;
+
 /** What a teacher can attach to feedback besides the voice note. */
 export const AttachmentKind = z.enum(['image', 'file', 'link', 'note']);
 export type AttachmentKind = z.infer<typeof AttachmentKind>;

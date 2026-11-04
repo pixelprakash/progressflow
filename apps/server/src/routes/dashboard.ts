@@ -11,9 +11,10 @@ import type {
   StudentRow,
   SubmissionDetail,
   SubmissionSummary,
+  TeacherConfig,
   TimePoint,
 } from '@progressflow/shared';
-import { RUBRIC_GUIDES } from '@progressflow/shared';
+import { RUBRIC_GUIDES, SyncCriterion, SyncType } from '@progressflow/shared';
 import { prisma } from '../db.js';
 import { fail, requireTeacher } from '../auth/middleware.js';
 
@@ -21,7 +22,19 @@ import { fail, requireTeacher } from '../auth/middleware.js';
 export const dashboardRouter = Router();
 dashboardRouter.use(requireTeacher);
 
-const CRITERIA = RUBRIC_GUIDES.map((g) => g.key);
+const DEFAULT_CRITERIA = RUBRIC_GUIDES.map((g) => g.key);
+
+/** What the teacher synced from the phone: their assessment types and rubric. */
+async function configOf(teacherId: string): Promise<TeacherConfig> {
+  const user = await prisma.user.findUniqueOrThrow({
+    where: { id: teacherId },
+    select: { settings: true },
+  });
+  const raw = (user.settings ?? {}) as { types?: unknown; rubric?: unknown };
+  const types = SyncType.array().safeParse(raw.types);
+  const rubric = SyncCriterion.array().min(1).safeParse(raw.rubric);
+  return { types: types.success ? types.data : [], rubric: rubric.success ? rubric.data : null };
+}
 const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
 const round = (n: number) => Math.round(n * 100) / 100;
 
@@ -43,7 +56,9 @@ async function load(teacherId: string) {
     },
     orderBy: { createdAt: 'asc' },
   });
-  return { klasses, assessments };
+  const config = await configOf(teacherId);
+  const criteria = config.rubric ? config.rubric.map((c) => c.key) : DEFAULT_CRITERIA;
+  return { klasses, assessments, criteria };
 }
 
 type Loaded = Awaited<ReturnType<typeof load>>;
@@ -57,8 +72,11 @@ function summaries(d: Loaded): SubmissionSummary[] {
     const info = student.get(a.studentId);
     const k = info?.k ?? classOf.get(a.assignment.klassId);
     if (!info || !k) return [];
+    // Marks for a criterion the teacher has since removed stay stored but are not shown or averaged.
     const scores: Scores = Object.fromEntries(
-      a.criterionScores.map((s) => [s.criterionKey, s.level]),
+      a.criterionScores
+        .filter((s) => d.criteria.includes(s.criterionKey))
+        .map((s) => [s.criterionKey, s.level]),
     );
     return [
       {
@@ -69,6 +87,7 @@ function summaries(d: Loaded): SubmissionSummary[] {
         classLabel: `${k.grade}-${k.section}`,
         kind: a.kind,
         createdAt: a.createdAt.toISOString(),
+        saved: !!a.completedAt && a.completedAt.getTime() >= a.updatedAt.getTime(),
         scores,
         average: mean(Object.values(scores)),
         pageCount: a.photos.length,
@@ -78,12 +97,12 @@ function summaries(d: Loaded): SubmissionSummary[] {
   });
 }
 
-const isWaiting = (s: SubmissionSummary) =>
-  s.pageCount > 0 && Object.keys(s.scores).length < CRITERIA.length;
+/** Photographed but the teacher has not pressed Save on the evaluation. */
+const isWaiting = (s: SubmissionSummary) => s.pageCount > 0 && !s.saved;
 
-function criterionMeans(subs: SubmissionSummary[]): Scores {
+function criterionMeans(subs: SubmissionSummary[], criteria: string[]): Scores {
   const out: Scores = {};
-  for (const key of CRITERIA) {
+  for (const key of criteria) {
     const m = mean(subs.flatMap((s) => (s.scores[key] === undefined ? [] : [s.scores[key]!])));
     if (m !== null) out[key] = round(m);
   }
@@ -96,7 +115,11 @@ function points(subs: SubmissionSummary[]): TimePoint[] {
     .map((s) => ({ t: s.createdAt, scores: s.scores, average: round(s.average!) }));
 }
 
-function classSummary(k: Loaded['klasses'][number], subs: SubmissionSummary[]): ClassSummary {
+function classSummary(
+  k: Loaded['klasses'][number],
+  subs: SubmissionSummary[],
+  criteria: string[],
+): ClassSummary {
   const mine = subs.filter((s) => s.classId === k.id);
   const avg = mean(mine.flatMap((s) => (s.average === null ? [] : [s.average])));
   return {
@@ -108,10 +131,14 @@ function classSummary(k: Loaded['klasses'][number], subs: SubmissionSummary[]): 
     studentCount: k.enrollments.length,
     submissionCount: mine.length,
     waiting: mine.filter(isWaiting).length,
-    criterionAverages: criterionMeans(mine),
+    criterionAverages: criterionMeans(mine, criteria),
     average: avg === null ? null : round(avg),
   };
 }
+
+dashboardRouter.get('/config', async (req, res) => {
+  res.json(await configOf(req.teacherId!));
+});
 
 dashboardRouter.get('/overview', async (req, res) => {
   const d = await load(req.teacherId!);
@@ -133,7 +160,7 @@ dashboardRouter.get('/overview', async (req, res) => {
       }),
     },
     average: avg === null ? null : round(avg),
-    classes: d.klasses.map((k) => classSummary(k, subs)),
+    classes: d.klasses.map((k) => classSummary(k, subs, d.criteria)),
     recent: [...subs].reverse().slice(0, 8),
   };
   res.json(out);
@@ -173,12 +200,12 @@ dashboardRouter.get('/classes/:id', async (req, res) => {
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([month, group]) => ({
       t: `${month}-15T00:00:00.000Z`,
-      scores: criterionMeans(group),
+      scores: criterionMeans(group, d.criteria),
       average: round(mean(group.map((g) => g.average!))!),
     }));
 
   const out: ClassDetail = {
-    summary: classSummary(k, all),
+    summary: classSummary(k, all, d.criteria),
     students,
     trend,
     submissions: [...subs].reverse(),

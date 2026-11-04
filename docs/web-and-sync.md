@@ -13,7 +13,7 @@ Phone side: `apps/mobile/src/sync.tsx`, mapping in `syncMap.ts`.
 Server side: `apps/server/src/routes/{auth,sync,media,dashboard}.ts`.
 The generic table envelope in `sync.ts` is unused and superseded.
 
-Not built: pulling data *down* to a new phone, and editing scores from the web.
+Not built: pulling data _down_ to a new phone, and editing scores from the web.
 Students and their reviews are covered in [student-portal.md](student-portal.md).
 
 ## Run it (no Docker needed)
@@ -41,6 +41,24 @@ Plain http is only accepted for localhost and private networks.
 The Android build allows cleartext traffic for this; switch it off
 (`usesCleartextTraffic` in `app.json`) for anything released.
 
+## What the push carries (version 2, 5 Nov 2026)
+
+`POST /v1/sync/push` now also carries:
+
+- `kind` on each submission is any short id (`assignment`, `exam1`, a teacher-made `t_ab12cd34`);
+  the old four-value enum is gone (migration `20261105000000_teacher_types_rubric` turns the column into text).
+- `completedAt`: when the teacher pressed Save. The dashboard's "waiting" is photographed and not saved.
+- `types` and `rubric` (optional): the teacher's assessment types and rubric, stored in `User.settings`
+  and returned by `GET /v1/config`. `rubric: null` resets to the standard four; leaving the field out
+  changes nothing. Marks for a criterion that is no longer in the rubric stay stored but leave the averages.
+- `deleted` `{classes, students, submissions}`: ids deleted on the phone. The server soft-deletes the rows
+  (a class takes its students and their work with it), erases the stored photos, recordings and attachments,
+  and a deleted student's portal code stops working. Ids that are not the teacher's, or not there, are ignored.
+  The response echoes `deleted` so the phone can stop reporting them.
+
+Known limits: the student portal's review form still uses the standard four criteria; a student sees the
+teacher's label for a teacher-made type but the dictionary name for a renamed built-in.
+
 ## Security notes
 
 - scrypt password hashes; JWT in an httpOnly, SameSite=Lax cookie (12 h) for web,
@@ -61,12 +79,12 @@ not been verified from here.
 Environment variables (Project → Settings → Environment Variables), needed at
 build time as well as runtime:
 
-| Name | Value |
-|---|---|
-| `DATABASE_URL` | the **direct** `postgres://…` connection string (with Prisma Postgres, the TCP one, not the `prisma+postgres://` Accelerate URL) |
-| `S3_BUCKET`, `S3_ACCESS_KEY`, `S3_SECRET_KEY` | the private bucket and an access key limited to it |
+| Name                                              | Value                                                                                                                                |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `DATABASE_URL`                                    | the **direct** `postgres://…` connection string (with Prisma Postgres, the TCP one, not the `prisma+postgres://` Accelerate URL)     |
+| `S3_BUCKET`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`     | the private bucket and an access key limited to it                                                                                   |
 | `S3_ENDPOINT`, `S3_REGION`, `S3_FORCE_PATH_STYLE` | R2: `https://<account>.r2.cloudflarestorage.com`, region `auto`, `false`. AWS S3: leave the endpoint empty, set your region, `false` |
-| `JWT_SECRET` | a long random string, e.g. `openssl rand -base64 48`. The server refuses to start in production with the dev default |
+| `JWT_SECRET`                                      | a long random string, e.g. `openssl rand -base64 48`. The server refuses to start in production with the dev default                 |
 
 Limits to know about:
 

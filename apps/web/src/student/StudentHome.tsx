@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { kindKey, fmt } from '../data';
+import { kindText, fmt } from '../data';
 import { useLang } from '../i18n';
 import { GrowthChart } from '../components/GrowthChart';
 import { useStudent } from './session';
@@ -25,7 +25,7 @@ export function StudentHome() {
           {needSelf.map((p) => (
             <li key={p.id}>
               <Link className="btn-link" to={`/student/review/${p.id}`}>
-                {t('sp.todoSelf')} · {t(kindKey(p.kind))}, {fmtDate(p.createdAt)}
+                {t('sp.todoSelf')} · {kindText(t, p.kind)}, {fmtDate(p.createdAt)}
               </Link>
             </li>
           ))}
@@ -54,7 +54,7 @@ export function StudentHome() {
                 )}
               </div>
               <div className="sub-meta">
-                <strong>{t(kindKey(p.kind))}</strong>
+                <strong>{kindText(t, p.kind)}</strong>
                 <span className="muted small">{fmtDate(p.createdAt)}</span>
                 <span className="row gap">
                   {p.average !== null ? (

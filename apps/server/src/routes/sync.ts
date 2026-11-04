@@ -6,7 +6,7 @@ import type { MediaWanted, SyncPushResponse, SyncSubmission } from '@progressflo
 import { prisma } from '../db.js';
 import { fail, requireTeacher } from '../auth/middleware.js';
 import { academicYear, derivedUuid } from '../services/ids.js';
-import { exists } from '../services/media.js';
+import { exists, remove } from '../services/media.js';
 import { DEFAULT_RUBRIC_ID } from '../services/rubric.js';
 
 /**
@@ -26,15 +26,33 @@ syncRouter.post('/sync/push', requireTeacher, async (req, res) => {
   const body = SyncPushBody.safeParse(req.body);
   if (!body.success) return fail(res, 400, 'invalid', 'sync payload is malformed');
   const teacherId = req.teacherId!;
-  const { classes, students, submissions } = body.data;
+  const { classes, students, submissions, deleted } = body.data;
 
   const teacher = await prisma.user.findUniqueOrThrow({ where: { id: teacherId } });
   const accepted: string[] = [];
   const skipped: string[] = [];
+  const purge: string[] = [];
 
   try {
     await prisma.$transaction(
       async (tx) => {
+        // --- deletions first, so a class that was deleted and re-created ends up alive ----
+        purge.push(...(await applyDeletions(tx, teacherId, deleted)));
+
+        // --- the teacher's own types and rubric -------------------------------------------
+        if (body.data.types !== undefined || body.data.rubric !== undefined) {
+          const settings = { ...((teacher.settings ?? {}) as Record<string, unknown>) };
+          if (body.data.types !== undefined) settings.types = body.data.types;
+          if (body.data.rubric !== undefined) {
+            if (body.data.rubric === null) delete settings.rubric;
+            else settings.rubric = body.data.rubric;
+          }
+          await tx.user.update({
+            where: { id: teacherId },
+            data: { settings: settings as Prisma.InputJsonValue },
+          });
+        }
+
         // --- classes --------------------------------------------------------
         for (const c of classes) {
           const found = await tx.klass.findUnique({ where: { id: c.id } });
@@ -146,11 +164,15 @@ syncRouter.post('/sync/push', requireTeacher, async (req, res) => {
     throw e;
   }
 
+  // Erased work must not linger in storage; a file that is already gone is fine.
+  await Promise.all(purge.map((key) => remove(key).catch(() => {})));
+
   const mediaWanted = await missingMedia(
     teacherId,
     submissions.filter((s) => accepted.includes(s.id)),
   );
   const out: SyncPushResponse = {
+    deleted,
     accepted,
     skipped,
     mediaWanted,
@@ -160,6 +182,113 @@ syncRouter.post('/sync/push', requireTeacher, async (req, res) => {
 });
 
 type Tx = Prisma.TransactionClient;
+
+/**
+ * Soft-deletes what the teacher deleted on the phone and returns the storage keys of the
+ * photos, recordings and attachments to erase. Only rows under this teacher's classes are
+ * touched; an id that belongs to someone else, or to nothing, is quietly ignored.
+ */
+async function applyDeletions(
+  tx: Tx,
+  teacherId: string,
+  del: { classes: string[]; students: string[]; submissions: string[] },
+): Promise<string[]> {
+  const now = new Date();
+  const assessmentIds = new Set<string>();
+
+  // Classes: the class, its assignments and enrollments, its students and all their work.
+  const ownedClasses = del.classes.length
+    ? await tx.klass.findMany({
+        where: { id: { in: del.classes }, teacherId },
+        select: { id: true, enrollments: { select: { studentId: true } } },
+      })
+    : [];
+  const studentIds = new Set(del.students);
+  for (const k of ownedClasses) for (const e of k.enrollments) studentIds.add(e.studentId);
+
+  // Students: only those enrolled in one of this teacher's classes.
+  const ownedStudents = studentIds.size
+    ? await tx.student.findMany({
+        where: {
+          id: { in: [...studentIds] },
+          enrollments: { some: { klass: { teacherId } } },
+        },
+        select: { id: true },
+      })
+    : [];
+  const ownedStudentIds = ownedStudents.map((s) => s.id);
+
+  if (ownedStudentIds.length) {
+    const theirs = await tx.assessment.findMany({
+      where: {
+        deletedAt: null,
+        assignment: { klass: { teacherId } },
+        OR: [{ studentId: { in: ownedStudentIds } }, { assessorId: { in: ownedStudentIds } }],
+      },
+      select: { id: true },
+    });
+    theirs.forEach((a) => assessmentIds.add(a.id));
+    await tx.enrollment.updateMany({
+      where: { studentId: { in: ownedStudentIds }, klass: { teacherId } },
+      data: { deletedAt: now },
+    });
+    await tx.student.updateMany({
+      where: { id: { in: ownedStudentIds } },
+      data: { deletedAt: now },
+    });
+  }
+
+  if (ownedClasses.length) {
+    const ids = ownedClasses.map((k) => k.id);
+    const inClass = await tx.assessment.findMany({
+      where: { deletedAt: null, assignment: { klassId: { in: ids } } },
+      select: { id: true },
+    });
+    inClass.forEach((a) => assessmentIds.add(a.id));
+    await tx.assignment.updateMany({ where: { klassId: { in: ids } }, data: { deletedAt: now } });
+    await tx.enrollment.updateMany({ where: { klassId: { in: ids } }, data: { deletedAt: now } });
+    await tx.klass.updateMany({ where: { id: { in: ids } }, data: { deletedAt: now } });
+  }
+
+  // Submissions, and any self or peer reviews written about them.
+  if (del.submissions.length) {
+    const mine = await tx.assessment.findMany({
+      where: {
+        id: { in: del.submissions },
+        assessorType: 'teacher',
+        assignment: { klass: { teacherId } },
+      },
+      select: { id: true, reviews: { select: { id: true } } },
+    });
+    for (const a of mine) {
+      assessmentIds.add(a.id);
+      a.reviews.forEach((r) => assessmentIds.add(r.id));
+    }
+  }
+
+  if (assessmentIds.size === 0) return [];
+  const ids = [...assessmentIds];
+  const photos = await tx.artworkPhoto.findMany({ where: { assessmentId: { in: ids } } });
+  const voices = await tx.voiceNote.findMany({ where: { assessmentId: { in: ids } } });
+  const files = await tx.feedbackAttachment.findMany({
+    where: { assessmentId: { in: ids }, storageKey: { not: null } },
+  });
+  await tx.artworkPhoto.updateMany({
+    where: { assessmentId: { in: ids } },
+    data: { deletedAt: now },
+  });
+  await tx.voiceNote.updateMany({ where: { assessmentId: { in: ids } }, data: { deletedAt: now } });
+  await tx.feedbackAttachment.updateMany({
+    where: { assessmentId: { in: ids } },
+    data: { deletedAt: now },
+  });
+  await tx.assessment.updateMany({ where: { id: { in: ids } }, data: { deletedAt: now } });
+  return [
+    ...photos.map((p) => p.storageKey),
+    ...voices.map((v) => v.storageKey),
+    ...files.flatMap((f) => (f.storageKey ? [f.storageKey] : [])),
+  ];
+}
 
 async function writeSubmission(
   tx: Tx,
@@ -174,6 +303,7 @@ async function writeSubmission(
     assessorType: 'teacher' as const,
     assessorId: teacherId,
     kind: sub.kind,
+    completedAt: sub.completedAt ? new Date(sub.completedAt) : null,
     note: sub.note,
     submittedAt: new Date(sub.createdAt),
     updatedAt,

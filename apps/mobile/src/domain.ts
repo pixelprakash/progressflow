@@ -114,7 +114,18 @@ export interface AppData {
   /** The teacher's own rubric. Absent = the built-in four criteria. */
   rubric?: CriterionGuide[];
   prefs?: Prefs;
+  /** Ids deleted on the phone that the server has not been told about yet. */
+  deleted?: Tombstones;
 }
+
+export interface Tombstones {
+  classes: string[];
+  students: string[];
+  submissions: string[];
+}
+
+export const noTombstones = (d: Tombstones | undefined): number =>
+  d ? d.classes.length + d.students.length + d.submissions.length : 0;
 
 /** Built-in assessment types: the id is what is stored; the name comes from the dictionary. */
 export const BUILTIN_TYPE_ICONS: Record<string, string> = {

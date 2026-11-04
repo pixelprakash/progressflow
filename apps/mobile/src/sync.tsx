@@ -13,9 +13,10 @@ import * as FileSystem from 'expo-file-system';
 import * as SecureStore from 'expo-secure-store';
 import type { AuthResponse, MediaWanted, SyncPushResponse } from '@progressflow/shared';
 import { MOBILE_RE, useAuth } from './auth';
+import { noTombstones } from './domain';
 import type { AppData } from './domain';
 import { dataRoot, useStore } from './store';
-import { toPush } from './syncMap';
+import { toPush, toSyncRubric, toSyncTypes } from './syncMap';
 import { isPrivateHost, parseHttpUrl } from './url';
 
 /**
@@ -69,7 +70,12 @@ const EMPTY_FILE: SyncFile = { synced: {}, meta: '', lastSyncAt: null };
 const keyOf = (id: string) => `pf_sync_${id.replace(/-/g, '')}`;
 
 function fingerprint(d: AppData): string {
-  const s = JSON.stringify([d.classes, d.students.map((x) => [x.id, x.classId, x.name, x.rollNo])]);
+  const s = JSON.stringify([
+    d.classes,
+    d.students.map((x) => [x.id, x.classId, x.name, x.rollNo]),
+    toSyncTypes(d),
+    toSyncRubric(d),
+  ]);
   let h = 5381;
   for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
   return `${s.length}:${h}`;
@@ -112,7 +118,7 @@ async function http<T>(
 
 export function SyncProvider({ children }: { children: ReactNode }) {
   const { current: teacher } = useAuth();
-  const { data, ready } = useStore();
+  const { data, ready, clearDeleted } = useStore();
   const [cfg, setCfg] = useState<Config | null>(null);
   const [file, setFile] = useState<SyncFile>(EMPTY_FILE);
   const [status, setStatus] = useState<SyncStatus>('unlinked');
@@ -155,7 +161,12 @@ export function SyncProvider({ children }: { children: ReactNode }) {
   const metaChanged = useCallback((d: AppData, f: SyncFile) => f.meta !== fingerprint(d), []);
 
   const pending = useMemo(
-    () => (cfg ? changed(data, file).length + (metaChanged(data, file) ? 1 : 0) : 0),
+    () =>
+      cfg
+        ? changed(data, file).length +
+          (metaChanged(data, file) ? 1 : 0) +
+          noTombstones(data.deleted)
+        : 0,
     [cfg, data, file, changed, metaChanged],
   );
 
@@ -170,7 +181,8 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       const todo = changed(d, f);
       const meta = fingerprint(d);
       const needMeta = f.meta !== meta;
-      if (todo.length === 0 && !needMeta) {
+      const needDeletes = noTombstones(d.deleted) > 0;
+      if (todo.length === 0 && !needMeta && !needDeletes) {
         setStatus('idle');
         return;
       }
@@ -184,12 +196,16 @@ export function SyncProvider({ children }: { children: ReactNode }) {
         if (bi > 0) {
           payload.classes = [];
           payload.students = [];
+          delete payload.types;
+          delete payload.rubric;
+          payload.deleted = { classes: [], students: [], submissions: [] };
         }
         const res = await http<SyncPushResponse>(`${cfg.serverUrl}/v1/sync/push`, {
           token: cfg.token,
           json: payload,
         });
 
+        if (bi === 0 && res.deleted) clearDeleted(res.deleted);
         const failed = await uploadMedia(cfg, batch, res.mediaWanted);
         const synced = { ...f.synced };
         for (const s of batch) {
@@ -218,7 +234,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     } finally {
       running.current = false;
     }
-  }, [cfg, changed, saveFile]);
+  }, [cfg, changed, saveFile, clearDeleted]);
 
   // Auto-sync: shortly after changes, and retry when offline/erroring.
   useEffect(() => {

@@ -1,5 +1,6 @@
 import type { TimePoint } from '@progressflow/shared';
 import { useLang } from '../i18n';
+import { useTeacher } from '../teacher';
 
 const W = 720;
 const H = 280;
@@ -7,7 +8,8 @@ const PAD = { l: 36, r: 16, t: 14, b: 34 };
 
 /** Time-scaled lines for the four criteria on the 1–4 performance scale. */
 export function GrowthChart({ points, label }: { points: TimePoint[]; label: string }) {
-  const { guides, lang } = useLang();
+  const { lang } = useLang();
+  const { guides } = useTeacher();
   if (points.length === 0) return null;
   const ts = points.map((p) => new Date(p.t).getTime());
   const t0 = Math.min(...ts);

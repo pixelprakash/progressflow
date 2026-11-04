@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { AssessmentKind, Language, PerformanceLevel } from './enums.js';
+import { Language, PerformanceLevel } from './enums.js';
 import { RUBRIC_GUIDES } from './rubricGuide.js';
 import type { AnnotationStroke } from './entities.js';
 import type { Scores, TimePoint } from './dashboard.js';
@@ -99,7 +99,8 @@ export interface StudentProfile {
 
 export interface StudentPiece {
   id: string;
-  kind: AssessmentKind;
+  /** An assessment type id. */
+  kind: string;
   createdAt: string;
   pages: { id: string; width: number; height: number; strokes: AnnotationStroke[] }[];
   scores: Scores;

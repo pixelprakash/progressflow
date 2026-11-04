@@ -268,6 +268,7 @@ export function RubricScreen({ onBack }: { onBack: () => void }) {
                   style={[s.input, { minHeight: 72 }]}
                   multiline
                   textAlignVertical="top"
+                  maxLength={400}
                   value={editing.levels[l]}
                   onChangeText={(x) => patch({ levels: { ...editing.levels, [l]: x } })}
                   placeholder={t('rb.levelPh')}

@@ -36,6 +36,22 @@ export function useApi<T>(
   return { data, error, loading, reload: () => setTick((n) => n + 1) };
 }
 
-export const kindKey = (kind: string) => `kind.${kind}` as TKey;
+const KNOWN_KINDS = new Set([
+  'assignment',
+  'exam1',
+  'exam2',
+  'quarterly',
+  'sketch',
+  'regular',
+  'progress',
+  'portfolio',
+]);
+/** The dictionary key for an assessment type, or null for a teacher's own type (its label is the kind). */
+export const kindKey = (kind: string) => (KNOWN_KINDS.has(kind) ? (`kind.${kind}` as TKey) : null);
+/** What a student reads: a known type is translated, a teacher's own type arrives as its label. */
+export const kindText = (t: (k: TKey) => string, kind: string) => {
+  const k = kindKey(kind);
+  return k ? t(k) : kind;
+};
 export const fmt = (n: number | null | undefined) =>
   n === null || n === undefined ? '—' : n.toFixed(1);

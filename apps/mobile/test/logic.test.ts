@@ -16,7 +16,7 @@ import {
 import { classReport, studentReport } from '../src/reports/model';
 import type { ReportEnv } from '../src/reports/model';
 import { renderCsv, renderDocx, renderHtml, renderXlsx } from '../src/reports/render';
-import { toServerKind } from '../src/syncMap';
+import { toPush } from '../src/syncMap';
 import { matchRoster } from '../src/capture/match';
 
 /** Logic that does not need a phone: roster import, analytics, report files. Run: npm run test:mobile */
@@ -178,8 +178,17 @@ function analytics(data: AppData) {
     'edit after save = unsaved',
   );
   ok(!isSaved({ completedAt: null, updatedAt: '2026-01-03T00:00:00Z' }), 'never saved');
-  eq(toServerKind('exam1'), 'regular', 'exam files as regular on the server');
-  eq(toServerKind('portfolio'), 'portfolio', 'core kinds pass through');
+  const push = toPush(
+    {
+      ...data,
+      types: [{ id: 'exam1', label: 'Unit test' }],
+      deleted: { classes: ['c'], students: [], submissions: [] },
+    },
+    null,
+  );
+  eq(push.types, [{ id: 'exam1', label: 'Unit test' }], 'types are sent with their labels');
+  eq(push.rubric, null, 'no custom rubric is sent as null');
+  eq(push.deleted.classes, ['c'], 'deleted ids ride along');
 }
 
 function matching(data: AppData) {

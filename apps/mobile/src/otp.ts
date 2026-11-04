@@ -27,7 +27,11 @@ export interface OtpSession {
 }
 
 export class OtpError extends Error {
-  constructor(public key: TKey) {
+  constructor(
+    public key: TKey,
+    /** Firebase's own error code, shown for the generic "could not be sent" case so it can be diagnosed. */
+    public detail?: string,
+  ) {
     super(key);
   }
 }
@@ -42,7 +46,7 @@ function mapError(e: unknown): OtpError {
     return new OtpError('m.otp.errMany');
   if (code.includes('network')) return new OtpError('m.otp.errNet');
   if (code.includes('invalid-phone-number')) return new OtpError('login.err.mobile');
-  return new OtpError('m.otp.errSend');
+  return new OtpError('m.otp.errSend', code || (e as Error | null)?.message?.slice(0, 80));
 }
 
 /** Sends a code to an E.164 number (+919876543210). */

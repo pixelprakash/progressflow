@@ -1,5 +1,6 @@
 import type { AnnotationStroke, CaptureQuality } from './entities.js';
-import type { AssessmentKind, AttachmentKind, Language } from './enums.js';
+import type { AttachmentKind, Language } from './enums.js';
+import type { SyncCriterion, SyncType } from './account.js';
 import type { ReviewView } from './student.js';
 
 /** Read-only dashboard responses (server -> web). Scores are criterion key -> level 1..4. */
@@ -12,8 +13,11 @@ export interface SubmissionSummary {
   studentName: string;
   classId: string;
   classLabel: string;
-  kind: AssessmentKind;
+  /** An assessment type id; names come from `TeacherConfig.types`. */
+  kind: string;
   createdAt: string;
+  /** The teacher pressed Save on this evaluation. */
+  saved: boolean;
   scores: Scores;
   average: number | null;
   pageCount: number;
@@ -102,4 +106,12 @@ export interface SubmissionDetail {
     text: string;
     ext: string | null;
   }[];
+}
+
+/** The teacher's own assessment types and rubric, as last synced from the phone. */
+export interface TeacherConfig {
+  /** In the teacher's order. Empty = the defaults (names from the dictionary). */
+  types: SyncType[];
+  /** null = the standard four criteria, in the viewer's language. */
+  rubric: SyncCriterion[] | null;
 }

@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import type { Scores, SubmissionSummary } from '@progressflow/shared';
-import { fmt, kindKey } from '../data';
+import { fmt } from '../data';
+import { useTeacher } from '../teacher';
 import { useLang } from '../i18n';
 
 export function Stat({
@@ -23,7 +24,7 @@ export function Stat({
 
 /** Four horizontal bars on the 1–4 scale, one per rubric criterion. */
 export function CriterionBars({ scores }: { scores: Scores }) {
-  const { guides } = useLang();
+  const { guides } = useTeacher();
   return (
     <div className="bars">
       {guides.map((g) => {
@@ -52,8 +53,9 @@ export function SubmissionCard({
   s: SubmissionSummary;
   showStudent?: boolean;
 }) {
-  const { t, fmtDate, guides } = useLang();
-  const waiting = s.pageCount > 0 && Object.keys(s.scores).length < guides.length;
+  const { t, fmtDate } = useLang();
+  const { kindLabel } = useTeacher();
+  const waiting = s.pageCount > 0 && !s.saved;
   return (
     <Link to={`/submissions/${s.id}`} className="card sub-card">
       <div className="thumb">
@@ -64,9 +66,9 @@ export function SubmissionCard({
         )}
       </div>
       <div className="sub-meta">
-        <strong>{showStudent ? s.studentName : t(kindKey(s.kind))}</strong>
+        <strong>{showStudent ? s.studentName : kindLabel(s.kind)}</strong>
         <span className="muted small">
-          {showStudent ? `${t(kindKey(s.kind))} · ` : ''}
+          {showStudent ? `${kindLabel(s.kind)} · ` : ''}
           {s.classLabel} · {fmtDate(s.createdAt)}
         </span>
         <span className="row gap">

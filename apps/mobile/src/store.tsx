@@ -19,8 +19,9 @@ import type {
   Prefs,
   RosterStudent,
   Submission,
+  Tombstones,
 } from './domain';
-import { DEFAULT_PREFS, isSaved } from './domain';
+import { DEFAULT_PREFS, isSaved, noTombstones } from './domain';
 import { demoData, migrate } from './demo';
 
 /**
@@ -68,6 +69,16 @@ export async function moveMedia(srcUri: string, folder: string, ext: string): Pr
   return dest;
 }
 
+const NONE: Tombstones = { classes: [], students: [], submissions: [] };
+const mark = (d: AppData, add: Partial<Tombstones>): Tombstones => {
+  const cur = d.deleted ?? NONE;
+  return {
+    classes: [...new Set([...cur.classes, ...(add.classes ?? [])])],
+    students: [...new Set([...cur.students, ...(add.students ?? [])])],
+    submissions: [...new Set([...cur.submissions, ...(add.submissions ?? [])])],
+  };
+};
+
 interface Store {
   ready: boolean;
   data: AppData;
@@ -96,6 +107,8 @@ interface Store {
   setTypes: (types: AssessmentType[]) => void;
   setRubric: (rubric: CriterionGuide[] | null) => void;
   setPrefs: (patch: Partial<Prefs>) => void;
+  /** The server confirmed these deletions; stop reporting them. */
+  clearDeleted: (acked: Tombstones) => void;
 }
 
 const Ctx = createContext<Store | null>(null);
@@ -167,6 +180,7 @@ export function StoreProvider({ dataDir, children }: { dataDir: string; children
           students: cur.students.filter((st) => st.classId !== id),
           submissions: cur.submissions.filter((x) => !gone.has(x.studentId)),
           inbox: (cur.inbox ?? []).filter((i) => i.classId !== id),
+          deleted: mark(cur, { classes: [id] }),
         }));
       },
       addStudent: (st) => apply((d) => ({ ...d, students: [...d.students, st] })),
@@ -182,6 +196,7 @@ export function StoreProvider({ dataDir, children }: { dataDir: string; children
           ...d,
           students: d.students.filter((st) => st.id !== id),
           submissions: d.submissions.filter((x) => x.studentId !== id),
+          deleted: mark(d, { students: [id] }),
         }));
       },
       addSubmissions: (subs) => apply((d) => ({ ...d, submissions: [...d.submissions, ...subs] })),
@@ -205,7 +220,11 @@ export function StoreProvider({ dataDir, children }: { dataDir: string; children
       deleteSubmission: (id) => {
         const sub = dataRef.current.submissions.find((x) => x.id === id);
         if (sub) deleteFiles(filesOf(sub));
-        apply((d) => ({ ...d, submissions: d.submissions.filter((x) => x.id !== id) }));
+        apply((d) => ({
+          ...d,
+          submissions: d.submissions.filter((x) => x.id !== id),
+          deleted: mark(d, { submissions: [id] }),
+        }));
       },
       moveKind: (from, to) =>
         apply((d) => {
@@ -233,6 +252,18 @@ export function StoreProvider({ dataDir, children }: { dataDir: string; children
       },
       setTypes: (types) => apply((d) => ({ ...d, types })),
       setRubric: (rubric) => apply((d) => ({ ...d, rubric: rubric ?? undefined })),
+      clearDeleted: (acked) =>
+        apply((d) => {
+          const cur = d.deleted;
+          if (!cur) return d;
+          const keep = (have: string[], gone: string[]) => have.filter((x) => !gone.includes(x));
+          const next = {
+            classes: keep(cur.classes, acked.classes),
+            students: keep(cur.students, acked.students),
+            submissions: keep(cur.submissions, acked.submissions),
+          };
+          return { ...d, deleted: noTombstones(next) ? next : undefined };
+        }),
       setPrefs: (patch) =>
         apply((d) => ({ ...d, prefs: { ...DEFAULT_PREFS, ...d.prefs, ...patch } })),
     }),
