@@ -39,6 +39,13 @@
         }
       ],
       [
+        "expo-camera",
+        {
+          "cameraPermission": "ProgressFlow uses the camera to photograph student artwork for assessment.",
+          "recordAudioAndroid": false
+        }
+      ],
+      [
         "expo-av",
         {
           "microphonePermission": "ProgressFlow records short voice comments as feedback on student work."

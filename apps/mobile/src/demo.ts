@@ -63,6 +63,7 @@ function past(
     kind,
     createdAt: date,
     updatedAt: date,
+    completedAt: date,
     pages: [],
     scores: { composition: c, colour_theory: col, technical_skill: t, conceptual_depth: k },
     strokes: {},
@@ -86,7 +87,7 @@ export function demoData(mk: IdGen = fallbackUuid): AppData {
     sample: true,
     submissions: [
       past(mk(), aarav, '2026-08-12T09:00:00.000Z', 'sketch', [2, 2, 2, 2]),
-      past(mk(), aarav, '2026-09-09T09:00:00.000Z', 'regular', [3, 2, 3, 2]),
+      past(mk(), aarav, '2026-09-09T09:00:00.000Z', 'assignment', [3, 2, 3, 2]),
       past(mk(), aarav, '2026-10-07T09:00:00.000Z', 'progress', [3, 3, 3, 3]),
       past(mk(), aarav, '2026-10-21T09:00:00.000Z', 'portfolio', [4, 3, 4, 3]),
       past(mk(), diya, '2026-08-12T09:00:00.000Z', 'sketch', [3, 3, 2, 3]),
@@ -102,12 +103,12 @@ export function demoData(mk: IdGen = fallbackUuid): AppData {
 export function migrate(raw: unknown): AppData {
   const d = raw as Partial<AppData> | null;
   if (d && Array.isArray(d.classes) && Array.isArray(d.students) && Array.isArray(d.submissions)) {
-    return { ...(d as AppData), sample: d.sample ?? true };
+    return normalize({ ...(d as AppData), sample: d.sample ?? true });
   }
   const base = build(null);
   const old = (d?.students ?? []) as Omit<RosterStudent, 'classId'>[];
   const oldIds = new Set(old.map((s) => s.id));
-  return {
+  return normalize({
     sample: true,
     classes: base.classes,
     students: [
@@ -115,5 +116,25 @@ export function migrate(raw: unknown): AppData {
       ...base.students.filter((s) => !oldIds.has(s.id)),
     ],
     submissions: d?.submissions ?? [],
+  });
+}
+
+/**
+ * 'regular' was renamed 'assignment'. Work scored before the Save button existed
+ * counts as saved if every criterion had a mark, so old evaluations don't all show as pending.
+ */
+export function normalize(d: AppData): AppData {
+  return {
+    ...d,
+    submissions: d.submissions.map((s) => ({
+      ...s,
+      kind: s.kind === 'regular' ? 'assignment' : s.kind,
+      completedAt:
+        s.completedAt !== undefined
+          ? s.completedAt
+          : Object.keys(s.scores).length >= 4
+            ? s.updatedAt
+            : null,
+    })),
   };
 }

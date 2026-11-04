@@ -61,7 +61,7 @@ export const ISSUE_TEXT: Record<CaptureIssue, { title: string; fix: string; icon
   },
 };
 
-function sizeOf(uri: string): Promise<{ width: number; height: number }> {
+export function sizeOf(uri: string): Promise<{ width: number; height: number }> {
   return new Promise((resolve, reject) =>
     Image.getSize(uri, (width, height) => resolve({ width, height }), reject),
   );

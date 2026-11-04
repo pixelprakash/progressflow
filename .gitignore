@@ -39,3 +39,5 @@ tmp/
 
 # local dev database + uploads
 .data/
+apps/mobile/.test-out/
+apps/mobile/test/*.zip

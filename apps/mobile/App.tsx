@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, BackHandler, View } from 'react-native';
+import { ActivityIndicator, Alert, BackHandler, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from './src/auth';
@@ -7,10 +7,15 @@ import { LangProvider, useLang } from './src/lang';
 import { StoreProvider, useStore } from './src/store';
 import { SyncProvider } from './src/sync';
 import { scanPages, pickFromGallery } from './src/capture/scan';
+import { useIntake } from './src/capture/intake';
+import { PermissionsGate } from './src/permissions';
+import { usePrefs } from './src/hooks';
 import { AuthScreen } from './src/screens/AuthScreen';
 import { HomeScreen } from './src/screens/HomeScreen';
 import { ClassScreen } from './src/screens/ClassScreen';
-import { ReviewScreen } from './src/screens/ReviewScreen';
+import { BatchCaptureScreen } from './src/screens/BatchCaptureScreen';
+import { InboxScreen } from './src/screens/InboxScreen';
+import { RubricScreen } from './src/screens/RubricScreen';
 import { EvaluateScreen } from './src/screens/EvaluateScreen';
 import { StudentScreen } from './src/screens/StudentScreen';
 import { theme } from './src/theme';
@@ -18,12 +23,15 @@ import { theme } from './src/theme';
 type Route =
   | { name: 'home' }
   | { name: 'class'; id: string }
-  | { name: 'review'; classId: string; uris: string[] }
+  | { name: 'capture'; classId: string; replaceId?: string }
+  | { name: 'inbox'; classId: string }
+  | { name: 'rubric' }
   | { name: 'evaluate'; id: string }
   | { name: 'student'; id: string };
 
 function Root() {
   const { ready } = useStore();
+  const { t } = useLang();
   const [stack, setStack] = useState<Route[]>([{ name: 'home' }]);
   const route = stack[stack.length - 1] ?? { name: 'home' };
   const push = (r: Route) => setStack((s) => [...s, r]);
@@ -31,11 +39,11 @@ function Root() {
 
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (stack.length > 1 && route.name !== 'review') {
+      if (stack.length > 1) {
         pop();
         return true;
       }
-      return route.name === 'review'; // review confirms discard itself
+      return false;
     });
     return () => sub.remove();
   }, [stack.length, route.name]);
@@ -47,29 +55,38 @@ function Root() {
       </View>
     );
 
-  const startReview = (classId: string) => (uris: string[]) =>
-    uris.length && push({ name: 'review', classId, uris });
-
   switch (route.name) {
-    case 'review':
+    case 'capture':
       return (
-        <ReviewScreen
+        <BatchCaptureScreen
           classId={route.classId}
-          initialUris={route.uris}
-          onCancel={pop}
-          onSaved={(ids) =>
-            setStack(
-              ids.length === 1 && ids[0]
-                ? [
-                    { name: 'home' },
-                    { name: 'class', id: route.classId },
-                    { name: 'evaluate', id: ids[0] },
-                  ]
-                : [{ name: 'home' }, { name: 'class', id: route.classId }],
-            )
-          }
+          {...(route.replaceId ? { replaceId: route.replaceId } : {})}
+          onDone={() => {
+            // Straight to the inbox so the papers can be sorted; a retake returns to it too.
+            const classId = route.classId;
+            setStack((st) => [
+              ...st.slice(0, -1).filter((r) => r.name !== 'inbox'),
+              { name: 'inbox', classId },
+            ]);
+          }}
         />
       );
+    case 'inbox':
+      return (
+        <InboxScreen
+          classId={route.classId}
+          onBack={pop}
+          onCapture={(replaceId) =>
+            push({ name: 'capture', classId: route.classId, ...(replaceId ? { replaceId } : {}) })
+          }
+          onFiled={(n) => {
+            pop();
+            Alert.alert(t('m.inb.filedTitle'), t('m.inb.filedBody', { n }));
+          }}
+        />
+      );
+    case 'rubric':
+      return <RubricScreen onBack={pop} />;
     case 'evaluate':
       return (
         <EvaluateScreen
@@ -87,19 +104,39 @@ function Root() {
         />
       );
     case 'class':
+      return <ClassRoute id={route.id} pop={pop} push={push} />;
+    default:
       return (
-        <ClassScreen
-          classId={route.id}
-          onBack={pop}
-          onScan={() => void scanPages().then(startReview(route.id))}
-          onGallery={() => void pickFromGallery().then(startReview(route.id))}
-          onOpenSubmission={(id) => push({ name: 'evaluate', id })}
-          onOpenStudent={(id) => push({ name: 'student', id })}
+        <HomeScreen
+          onOpenClass={(id) => push({ name: 'class', id })}
+          onRubric={() => push({ name: 'rubric' })}
         />
       );
-    default:
-      return <HomeScreen onOpenClass={(id) => push({ name: 'class', id })} />;
   }
+}
+
+/** The class screen with its capture shortcuts: camera, scanner or gallery all end in the inbox. */
+function ClassRoute({ id, push, pop }: { id: string; push: (r: Route) => void; pop: () => void }) {
+  const intake = useIntake(id);
+  const prefs = usePrefs();
+  const toInbox = (uris: string[]) => {
+    if (uris.length) void intake(uris).then((n) => n && push({ name: 'inbox', classId: id }));
+  };
+  return (
+    <ClassScreen
+      classId={id}
+      onBack={pop}
+      onCapture={() =>
+        prefs.captureMode === 'original'
+          ? push({ name: 'capture', classId: id })
+          : void scanPages().then(toInbox)
+      }
+      onGallery={() => void pickFromGallery().then(toInbox)}
+      onOpenInbox={() => push({ name: 'inbox', classId: id })}
+      onOpenSubmission={(sid) => push({ name: 'evaluate', id: sid })}
+      onOpenStudent={(sid) => push({ name: 'student', id: sid })}
+    />
+  );
 }
 
 function AuthGate() {
@@ -132,9 +169,11 @@ export default function App() {
     <SafeAreaProvider>
       <StatusBar style="dark" />
       <LangProvider>
-        <AuthProvider>
-          <AuthGate />
-        </AuthProvider>
+        <PermissionsGate>
+          <AuthProvider>
+            <AuthGate />
+          </AuthProvider>
+        </PermissionsGate>
       </LangProvider>
     </SafeAreaProvider>
   );

@@ -15,13 +15,9 @@ import { Audio } from 'expo-av';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
-import type {
-  AnnotationTool,
-  AssessmentKind,
-  Language,
-  PerformanceLevel,
-} from '@progressflow/shared';
-import { KIND_META, compositeScore } from '../domain';
+import type { AnnotationTool, Language, PerformanceLevel } from '@progressflow/shared';
+import { compositeScore, isSaved } from '../domain';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { levelLabel } from '@progressflow/shared';
 import type { TKey } from '@progressflow/shared';
 import { useLang } from '../lang';
@@ -34,6 +30,8 @@ import { theme } from '../theme';
 import { AnnotationCanvas } from '../components/AnnotationCanvas';
 import { HintDiagram } from '../components/HintDiagram';
 import { Btn, Chip, Header, Icon, IconBtn, Sheet } from '../components/ui';
+import { KindBar } from '../components/KindBar';
+import { useRubric } from '../hooks';
 import { pickFromGallery, scanPages } from '../capture/scan';
 import { analyseCapture } from '../capture/quality';
 
@@ -50,6 +48,9 @@ const LANGS: { code: Language; label: string }[] = [
   { code: 'te', label: 'తెలుగు' },
 ];
 const LEVELS: PerformanceLevel[] = [1, 2, 3, 4];
+const BUILTIN_KEYS = ['composition', 'colour_theory', 'technical_skill', 'conceptual_depth'];
+const timeOf = (iso: string) =>
+  new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 
 const fmt = (ms: number) =>
   `${Math.floor(ms / 60000)}:${String(Math.floor((ms % 60000) / 1000)).padStart(2, '0')}`;
@@ -63,7 +64,8 @@ export function EvaluateScreen({
   onBack: () => void;
   onStudent: (id: string) => void;
 }) {
-  const { data, updateSubmission } = useStore();
+  const { data, updateSubmission, completeSubmission, deleteSubmission } = useStore();
+  const insets = useSafeAreaInsets();
   const sub = data.submissions.find((x) => x.id === submissionId);
   const student = data.students.find((x) => x.id === sub?.studentId);
 
@@ -75,7 +77,8 @@ export function EvaluateScreen({
   const [color, setColor] = useState(COLORS[0] ?? '#E53935');
   const [hint, setHint] = useState<CriterionGuide | null>(null);
   const { current: teacher } = useAuth();
-  const { t, lang: uiLang, guides, shortDate } = useLang();
+  const { t, lang: uiLang, shortDate } = useLang();
+  const guides = useRubric();
   const [lang, setLang] = useState<Language>(teacher?.language ?? 'en');
   const [recording, setRecording] = useState(false);
   const [elapsed, setElapsed] = useState(0);
@@ -105,8 +108,39 @@ export function EvaluateScreen({
   const edit = (fn: (s: Submission) => Submission) => updateSubmission(sub.id, fn);
   const page = sub.pages[Math.min(pageIdx, sub.pages.length - 1)];
   const strokes = page ? (sub.strokes[page.id] ?? []) : [];
-  const avg = compositeScore(sub.scores);
-  const scored = Object.keys(sub.scores).length;
+  const keys = guides.map((g) => g.key);
+  const avg = compositeScore(sub.scores, keys);
+  const scored = keys.filter((k) => sub.scores[k] !== undefined).length;
+  const saved = isSaved(sub);
+
+  function save() {
+    const done = () => {
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      completeSubmission(sub!.id);
+    };
+    if (scored < guides.length) {
+      Alert.alert(t('m.ev.unmarkedTitle', { n: guides.length - scored }), t('m.ev.unmarkedBody'), [
+        { text: t('m.ev.keepMarking'), style: 'cancel' },
+        { text: t('m.ev.saveAnyway'), onPress: done },
+      ]);
+      return;
+    }
+    done();
+  }
+
+  function remove() {
+    Alert.alert(t('m.ev.deleteTitle'), t('m.ev.deleteBody', { name: student!.name }), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('m.ev.delete'),
+        style: 'destructive',
+        onPress: () => {
+          deleteSubmission(sub!.id);
+          onBack();
+        },
+      },
+    ]);
+  }
 
   const previous = data.submissions
     .filter((x) => x.studentId === sub.studentId && x.id !== sub.id && x.createdAt < sub.createdAt)
@@ -249,33 +283,29 @@ export function EvaluateScreen({
         subtitle={`${t('common.roll', { n: student.rollNo })} · ${shortDate(sub.createdAt)}`}
         onBack={onBack}
         right={
-          <IconBtn
-            icon="chart-line"
-            label={t('m.ev.progress')}
-            onPress={() => onStudent(student.id)}
-          />
+          <View style={{ flexDirection: 'row' }}>
+            <IconBtn
+              icon="chart-line"
+              label={t('m.ev.progress')}
+              onPress={() => onStudent(student.id)}
+            />
+            <IconBtn
+              icon="trash-can-outline"
+              label={t('m.ev.delete')}
+              color={theme.color.danger}
+              onPress={remove}
+            />
+          </View>
         }
       />
       <ScrollView
         scrollEnabled={!drawing}
         keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{ paddingBottom: theme.space.xl * 2 }}
+        contentContainerStyle={{ paddingBottom: theme.space.xl * 4 }}
       >
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={s.kindRow}
-        >
-          {(Object.keys(KIND_META) as AssessmentKind[]).map((k) => (
-            <Chip
-              key={k}
-              label={t(`kind.${k}`)}
-              icon={KIND_META[k].icon}
-              selected={sub.kind === k}
-              onPress={() => edit((x) => ({ ...x, kind: k }))}
-            />
-          ))}
-        </ScrollView>
+        <View style={{ paddingVertical: theme.space.md }}>
+          <KindBar selected={sub.kind} onSelect={(k) => edit((x) => ({ ...x, kind: k }))} />
+        </View>
 
         {page ? (
           <AnnotationCanvas
@@ -669,12 +699,37 @@ export function EvaluateScreen({
         )}
       </ScrollView>
 
+      <View style={[s.saveBar, { paddingBottom: theme.space.md + insets.bottom }]}>
+        <View style={{ flex: 1, gap: 2 }}>
+          <View style={s.statusRow}>
+            <Icon
+              name={saved ? 'check-circle' : 'circle-edit-outline'}
+              size={20}
+              color={saved ? theme.color.success : theme.color.warning}
+            />
+            <Text style={[s.status, { color: saved ? theme.color.success : theme.color.warning }]}>
+              {saved
+                ? t('m.ev.savedAt', { time: timeOf(sub.completedAt ?? sub.updatedAt) })
+                : sub.completedAt
+                  ? t('m.ev.changed')
+                  : t('m.ev.notSaved')}
+            </Text>
+          </View>
+          <Text style={s.meta}>{t('m.ev.scored', { n: scored, m: guides.length })}</Text>
+        </View>
+        {saved ? (
+          <Btn label={t('m.ev.savedBtn')} icon="check" kind="outline" onPress={onBack} />
+        ) : (
+          <Btn label={t('m.ev.saveBtn')} icon="content-save-outline" onPress={save} />
+        )}
+      </View>
+
       <Sheet visible={!!hint} onClose={() => setHint(null)} title={hint?.name ?? ''}>
         {hint && (
           <>
-            <HintDiagram kind={hint.key} />
+            {BUILTIN_KEYS.includes(hint.key) && <HintDiagram kind={hint.key} />}
             <Text style={s.descriptor}>{hint.tagline}</Text>
-            <Text style={s.sheetH}>{t('m.ev.lookFor')}</Text>
+            {hint.lookFor.length > 0 && <Text style={s.sheetH}>{t('m.ev.lookFor')}</Text>}
             {hint.lookFor.map((l) => (
               <View key={l.title} style={{ flexDirection: 'row', gap: 10 }}>
                 <Icon name="eye-outline" color={hint.color} size={20} />
@@ -684,8 +739,12 @@ export function EvaluateScreen({
                 </Text>
               </View>
             ))}
-            <Text style={s.sheetH}>{t('m.ev.askStudent')}</Text>
-            <Text style={s.descriptor}>“{hint.askStudent}”</Text>
+            {hint.askStudent ? (
+              <>
+                <Text style={s.sheetH}>{t('m.ev.askStudent')}</Text>
+                <Text style={s.descriptor}>“{hint.askStudent}”</Text>
+              </>
+            ) : null}
             <Text style={s.sheetH}>{t('m.ev.levelsLook')}</Text>
             {LEVELS.map((l) => (
               <View key={l} style={{ flexDirection: 'row', gap: 10 }}>
@@ -698,7 +757,7 @@ export function EvaluateScreen({
                 </Text>
               </View>
             ))}
-            <Text style={s.meta}>{t('m.ev.draftNote')}</Text>
+            {BUILTIN_KEYS.includes(hint.key) && <Text style={s.meta}>{t('m.ev.draftNote')}</Text>}
           </>
         )}
       </Sheet>
@@ -752,7 +811,18 @@ export function EvaluateScreen({
 
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: theme.color.bg },
-  kindRow: { padding: theme.space.md, gap: 8 },
+  saveBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.space.md,
+    paddingHorizontal: theme.space.md,
+    paddingTop: theme.space.sm,
+    backgroundColor: '#fff',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: theme.color.border,
+  },
+  statusRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  status: { fontSize: 15, fontWeight: '700' },
   noPhoto: {
     height: 160,
     alignItems: 'center',

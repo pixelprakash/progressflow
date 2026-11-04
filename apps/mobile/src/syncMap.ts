@@ -11,12 +11,21 @@ export const extOf = (uri: string, fallback: string) => {
   return (m?.[1] ?? fallback).toLowerCase();
 };
 
+/**
+ * The server stores four kinds. Core ones pass through; assignment, exams, quarterly
+ * and anything the teacher invented are filed as 'regular' there until the server
+ * learns the teacher's own types.
+ */
+export function toServerKind(kind: string): SyncSubmission['kind'] {
+  return kind === 'sketch' || kind === 'progress' || kind === 'portfolio' ? kind : 'regular';
+}
+
 export function toSyncSubmission(s: Submission): SyncSubmission {
   const pageIds = new Set(s.pages.map((p) => p.id));
   return {
     id: s.id,
     studentId: s.studentId,
-    kind: s.kind,
+    kind: toServerKind(s.kind),
     createdAt: s.createdAt,
     updatedAt: s.updatedAt,
     note: s.note,

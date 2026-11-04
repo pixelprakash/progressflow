@@ -1,27 +1,31 @@
 import { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LANGUAGE_NAMES } from '@progressflow/shared';
 import type { Language } from '@progressflow/shared';
-import { classLabel, sortClasses } from '../domain';
+import { classLabel, isSaved, sortClasses } from '../domain';
+import type { ClassRoom } from '../domain';
 import { useAuth } from '../auth';
 import { useLang } from '../lang';
-import { newId, useStore } from '../store';
+import { useStore } from '../store';
 import { theme } from '../theme';
 import { Btn, Chip, Header, Icon, IconBtn, Sheet } from '../components/ui';
 import { WebAccount } from '../components/WebAccount';
-
-const GRADES = Array.from({ length: 12 }, (_, i) => i + 1);
-const SECTIONS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+import { ClassSheet } from '../components/ClassSheet';
 
 /** The teacher's classes, grouped by grade, one card per section. */
-export function HomeScreen({ onOpenClass }: { onOpenClass: (id: string) => void }) {
-  const { data, addClass, loadSample } = useStore();
+export function HomeScreen({
+  onOpenClass,
+  onRubric,
+}: {
+  onOpenClass: (id: string) => void;
+  onRubric: () => void;
+}) {
+  const { data, loadSample } = useStore();
   const { current, logout } = useAuth();
-  const { t, lang, setLang, guides } = useLang();
+  const { t, lang, setLang } = useLang();
   const [profile, setProfile] = useState(false);
   const [adding, setAdding] = useState(false);
-  const [grade, setGrade] = useState(6);
-  const [section, setSection] = useState('A');
+  const [editing, setEditing] = useState<ClassRoom | undefined>();
 
   const classes = sortClasses(data.classes);
   const grades = [...new Set(classes.map((c) => c.grade))];
@@ -29,28 +33,10 @@ export function HomeScreen({ onOpenClass }: { onOpenClass: (id: string) => void 
   const stats = (classId: string) => {
     const ids = new Set(data.students.filter((st) => st.classId === classId).map((st) => st.id));
     const waiting = data.submissions.filter(
-      (sub) =>
-        ids.has(sub.studentId) &&
-        sub.pages.length > 0 &&
-        Object.keys(sub.scores).length < guides.length,
+      (sub) => ids.has(sub.studentId) && sub.pages.length > 0 && !isSaved(sub),
     ).length;
     return { students: ids.size, waiting };
   };
-
-  function create() {
-    if (data.classes.some((c) => c.grade === grade && c.section === section)) {
-      Alert.alert(t('m.home.dupTitle'), t('m.home.dupBody', { label: `${grade}-${section}` }));
-      return;
-    }
-    const first = data.classes[0];
-    addClass({
-      id: newId(),
-      grade,
-      section,
-      assignment: first?.assignment ?? 'Still life — pencil',
-    });
-    setAdding(false);
-  }
 
   return (
     <View style={s.root}>
@@ -58,11 +44,14 @@ export function HomeScreen({ onOpenClass }: { onOpenClass: (id: string) => void 
         title="ProgressFlow"
         subtitle={current ? `${current.name} · ${current.school}` : t('m.home.classes')}
         right={
-          <IconBtn
-            icon="account-circle-outline"
-            label={t('m.home.account')}
-            onPress={() => setProfile(true)}
-          />
+          <View style={{ flexDirection: 'row' }}>
+            <IconBtn icon="format-list-checks" label={t('m.home.rubric')} onPress={onRubric} />
+            <IconBtn
+              icon="account-circle-outline"
+              label={t('m.home.account')}
+              onPress={() => setProfile(true)}
+            />
+          </View>
         }
       />
       <ScrollView contentContainerStyle={s.content}>
@@ -100,10 +89,23 @@ export function HomeScreen({ onOpenClass }: { onOpenClass: (id: string) => void 
                       key={c.id}
                       style={s.card}
                       onPress={() => onOpenClass(c.id)}
+                      onLongPress={() => setEditing(c)}
                       accessibilityRole="button"
                       accessibilityLabel={t('common.class', { label: classLabel(c) })}
                     >
+                      <Pressable
+                        style={s.edit}
+                        hitSlop={8}
+                        onPress={() => setEditing(c)}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('m.home.editClass', { label: classLabel(c) })}
+                      >
+                        <Icon name="pencil-outline" size={20} color={theme.color.textMuted} />
+                      </Pressable>
                       <Text style={s.label}>{classLabel(c)}</Text>
+                      <Text style={s.meta} numberOfLines={1}>
+                        {c.assignment}
+                      </Text>
                       <Text style={s.meta}>{t('m.home.students', { n: st.students })}</Text>
                       {st.waiting > 0 ? (
                         <View style={s.badge}>
@@ -159,33 +161,8 @@ export function HomeScreen({ onOpenClass }: { onOpenClass: (id: string) => void 
         />
       </Sheet>
 
-      <Sheet visible={adding} onClose={() => setAdding(false)} title={t('m.home.addClassTitle')}>
-        <Text style={s.meta}>{t('m.home.grade')}</Text>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ gap: 8 }}
-        >
-          {GRADES.map((g) => (
-            <Chip key={g} label={String(g)} selected={grade === g} onPress={() => setGrade(g)} />
-          ))}
-        </ScrollView>
-        <Text style={s.meta}>{t('m.home.section')}</Text>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ gap: 8 }}
-        >
-          {SECTIONS.map((x) => (
-            <Chip key={x} label={x} selected={section === x} onPress={() => setSection(x)} />
-          ))}
-        </ScrollView>
-        <Btn
-          label={t('m.home.addNamed', { label: `${grade}-${section}` })}
-          icon="check"
-          onPress={create}
-        />
-      </Sheet>
+      <ClassSheet visible={adding} onClose={() => setAdding(false)} />
+      <ClassSheet visible={!!editing} editing={editing} onClose={() => setEditing(undefined)} />
     </View>
   );
 }
@@ -230,6 +207,15 @@ const s = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 2,
     marginTop: 4,
+  },
+  edit: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   badgeText: { fontSize: 12, fontWeight: '700', color: theme.color.warning },
 });

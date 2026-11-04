@@ -1,8 +1,8 @@
 import type {
   AnnotationStroke,
-  AssessmentKind,
   AttachmentKind,
   CaptureQuality,
+  CriterionGuide,
   Language,
   PerformanceLevel,
 } from '@progressflow/shared';
@@ -57,9 +57,12 @@ export interface Attachment {
 export interface Submission {
   id: string;
   studentId: string;
-  kind: AssessmentKind;
+  /** Id of an `AssessmentType`: built-in ('assignment', 'exam1'…) or one the teacher made. */
+  kind: string;
   createdAt: string;
   updatedAt: string;
+  /** Set when the teacher presses Save on the evaluation; cleared by later edits (updatedAt moves past it). */
+  completedAt?: string | null;
   pages: Page[];
   scores: Partial<Record<string, PerformanceLevel>>;
   /** Annotation strokes per page id. */
@@ -69,31 +72,88 @@ export interface Submission {
   note: string;
 }
 
+/** A photo captured in a batch and not yet matched to a student. */
+export interface InboxItem {
+  id: string;
+  classId: string;
+  uri: string;
+  width: number;
+  height: number;
+  createdAt: string;
+  /** Filled in by the sorting pass. */
+  quality?: CaptureQuality | null;
+  /** Student the sorting pass suggested, if it found one. */
+  guessId?: string | null;
+  /** 0–1; how sure the sorting pass was. */
+  guessConfidence?: number;
+  /** True once the sorting pass has looked at it. */
+  sorted?: boolean;
+}
+
+/** A kind of assessment the teacher can file work under. `label` overrides the built-in name. */
+export interface AssessmentType {
+  id: string;
+  label?: string;
+}
+
+export interface Prefs {
+  /** 'original' keeps the camera photo untouched; 'scan' uses the document scanner (auto-crop, may enhance). */
+  captureMode: 'original' | 'scan';
+}
+
 export interface AppData {
   /** True while the classes are the built-in sample data. */
   sample?: boolean;
   classes: ClassRoom[];
   students: RosterStudent[];
   submissions: Submission[];
+  /** Photos waiting to be sorted onto students. */
+  inbox?: InboxItem[];
+  /** The teacher's assessment types, in the order they chose. Absent = the defaults. */
+  types?: AssessmentType[];
+  /** The teacher's own rubric. Absent = the built-in four criteria. */
+  rubric?: CriterionGuide[];
+  prefs?: Prefs;
 }
 
-export const KIND_META: Record<AssessmentKind, { label: string; hint: string; icon: string }> = {
-  sketch: { label: 'Sketch', hint: 'Quick draft or study', icon: 'pencil-outline' },
-  regular: {
-    label: 'Regular check',
-    hint: 'Routine class assessment',
-    icon: 'clipboard-check-outline',
-  },
-  progress: { label: 'Progress check', hint: 'Compare with earlier work', icon: 'chart-line' },
-  portfolio: {
-    label: 'Portfolio piece',
-    hint: 'Finished, best-work piece',
-    icon: 'folder-star-outline',
-  },
+/** Built-in assessment types: the id is what is stored; the name comes from the dictionary. */
+export const BUILTIN_TYPE_ICONS: Record<string, string> = {
+  assignment: 'clipboard-check-outline',
+  exam1: 'file-document-edit-outline',
+  exam2: 'file-document-edit-outline',
+  quarterly: 'calendar-star',
+  sketch: 'pencil-outline',
+  progress: 'chart-line',
+  portfolio: 'folder-star-outline',
 };
 
-export function compositeScore(scores: Submission['scores']): number | null {
-  const v = Object.values(scores).filter((n): n is PerformanceLevel => n !== undefined);
+export const DEFAULT_TYPES: AssessmentType[] = [
+  { id: 'assignment' },
+  { id: 'exam1' },
+  { id: 'exam2' },
+  { id: 'quarterly' },
+  { id: 'sketch' },
+  { id: 'progress' },
+  { id: 'portfolio' },
+];
+
+export const isBuiltinType = (id: string) => id in BUILTIN_TYPE_ICONS;
+export const typeIcon = (id: string) => BUILTIN_TYPE_ICONS[id] ?? 'tag-outline';
+
+export const DEFAULT_PREFS: Prefs = { captureMode: 'original' };
+
+/** An evaluation counts as saved when the teacher pressed Save and has not changed it since. */
+export const isSaved = (s: Pick<Submission, 'completedAt' | 'updatedAt'>) =>
+  !!s.completedAt && s.completedAt >= s.updatedAt;
+
+/** Mean of the marks given. Pass the rubric's keys to ignore marks for criteria since removed. */
+export function compositeScore(
+  scores: Submission['scores'],
+  keys?: readonly string[],
+): number | null {
+  const v = Object.entries(scores)
+    .filter(([k, n]) => n !== undefined && (!keys || keys.includes(k)))
+    .map(([, n]) => n as PerformanceLevel);
   return v.length ? v.reduce<number>((a, b) => a + b, 0) / v.length : null;
 }
 
