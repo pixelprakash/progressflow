@@ -63,7 +63,11 @@ export function createApp() {
 
   if (existsSync(WEB_DIST)) {
     app.use(express.static(WEB_DIST, { index: false, maxAge: '1h' }));
-    app.get('*', (_req, res) => res.sendFile(resolve(WEB_DIST, 'index.html')));
+    app.get('*', (_req, res) =>
+      res.sendFile(resolve(WEB_DIST, 'index.html'), (err) => {
+        if (err) res.status(404).json({ error: { code: 'not_found', message: 'no such page' } });
+      }),
+    );
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars

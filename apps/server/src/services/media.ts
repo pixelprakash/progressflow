@@ -111,3 +111,21 @@ export async function remove(storageKey: string): Promise<void> {
   }
   await rm(pathFor(storageKey), { force: true });
 }
+
+/**
+ * Tells a deploy check whether storage is reachable and the credentials are accepted.
+ * Returns 'ok' or the error's name and HTTP status (never a secret), e.g. 'AccessDenied (403)'.
+ */
+export async function probe(): Promise<string> {
+  if (!usingS3) return 'ok (local disk)';
+  try {
+    await client().send(new HeadObjectCommand({ Bucket: config.S3_BUCKET, Key: '_probe' }));
+    return 'ok';
+  } catch (e) {
+    const err = e as { name?: string; $metadata?: { httpStatusCode?: number } };
+    const status = err.$metadata?.httpStatusCode;
+    // A missing key is the expected answer: the bucket and credentials work.
+    if (status === 404) return 'ok';
+    return `${err.name ?? 'error'}${status ? ` (${status})` : ''}`;
+  }
+}
